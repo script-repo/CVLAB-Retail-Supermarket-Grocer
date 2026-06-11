@@ -55,12 +55,9 @@ self-contained Python file.
 
 ## Screenshots
 
-> Add screenshots/GIFs here (e.g. `docs/images/live-analysis.png`,
-> `docs/images/portal.png`). Placeholders so the layout is ready:
-
 | Live analysis | Use-case portal |
 |---|---|
-| _live-analysis.png_ | _portal.png_ |
+| live-analysis.png | portal.png |
 
 ## Quick start (Docker)
 
