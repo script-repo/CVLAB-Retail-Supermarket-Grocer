@@ -1,0 +1,24 @@
+# Web
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pydantic==2.10.4
+pydantic-settings==2.7.1
+websockets==14.1
+
+# Computer vision
+ultralytics==8.3.55
+supervision==0.25.1
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+Pillow==11.0.0
+
+# Storage (Nutanix Objects / S3-compatible)
+boto3==1.35.90
+
+# Agentic ops (async client for the NAI OpenAI-compatible endpoint)
+httpx==0.28.1
+
+# Optional: self-hosted Roboflow inference for empty-shelf / spill weights.
+# Uncomment to enable offline model serving (large download).
+# inference==0.30.0

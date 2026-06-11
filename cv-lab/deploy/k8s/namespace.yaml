@@ -1,0 +1,6 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: retail-supermarket-grocery-cv
+  labels:
+    app.kubernetes.io/part-of: retail-supermarket-grocery-cv-lab

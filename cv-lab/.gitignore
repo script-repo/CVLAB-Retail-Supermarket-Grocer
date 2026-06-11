@@ -1,0 +1,7 @@
+backend/.env
+deploy/k8s/nai-secret.yaml
+deploy/k8s/objects-secret.yaml
+backend/data/
+backend/models/*.pt
+__pycache__/
+.venv/

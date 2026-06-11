@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cv-lab
+  namespace: retail-supermarket-grocery-cv
+  labels:
+    app: cv-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cv-lab
+  template:
+    metadata:
+      labels:
+        app: cv-lab
+    spec:
+      containers:
+        - name: cv-lab
+          # Replace with your pushed image, e.g.
+          #   ghcr.io/<your-org>/cvlab-retail:0.1.0
+          image: ghcr.io/your-org/cvlab-retail:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: STORAGE_BACKEND
+              value: "s3"
+            # S3-compatible object store endpoint (Nutanix Objects, MinIO, AWS S3...).
+            - name: S3_ENDPOINT
+              value: "https://objects.example.com"
+            - name: S3_BUCKET
+              value: "retail-supermarket-grocery-cv"
+            - name: S3_USE_PATH_STYLE
+              value: "true"
+            - name: S3_VERIFY_SSL
+              value: "false"
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: objects-credentials
+                  key: S3_ACCESS_KEY
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: objects-credentials
+                  key: S3_SECRET_KEY
+            - name: DEVICE
+              value: "cuda:0"
+            - name: TARGET_FPS
+              value: "15"
+            # LLM endpoint for the agentic-ops layer (any OpenAI-compatible API).
+            # Create the Secret first: see nai-secret.example.yaml
+            - name: NAI_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: nai-credentials
+                  key: NAI_BASE_URL
+            - name: NAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nai-credentials
+                  key: NAI_API_KEY
+            - name: NAI_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: nai-credentials
+                  key: NAI_MODEL
+            - name: NAI_VERIFY_SSL
+              value: "false"
+          resources:
+            requests:
+              cpu: "1"
+              memory: 4Gi
+            limits:
+              # Requires the NVIDIA GPU Operator (or device plugin) on the cluster.
+              # Remove the nvidia.com/gpu line to run CPU-only (slower).
+              nvidia.com/gpu: 1
+              memory: 8Gi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 20

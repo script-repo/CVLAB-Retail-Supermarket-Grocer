@@ -1,0 +1,21 @@
+# Most ingress controllers (Traefik, NGINX) proxy WebSockets transparently,
+# so /ws/analyze works without extra config.
+# Replace the host and ingressClassName with values for your cluster.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cv-lab
+  namespace: retail-supermarket-grocery-cv
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: cv-lab.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cv-lab
+                port:
+                  number: 80

@@ -1,0 +1,54 @@
+/* Retail-Supermarket-Grocery design tokens — shared with cv-portal (Retail-Supermarket-Grocery-Style-Guide.md).
+   Single source of truth for color, type, radius, elevation. */
+
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
+
+:root {
+  /* Greens */
+  --brand-green: #003D2A;
+  --brand-green-logo: #0E5A19;
+  --brand-green-fresh: #3EB36C;
+  --brand-green-tint: #E6EFEA;
+
+  /* Neutrals */
+  --brand-cream: #E9E3D2;
+  --brand-bg: #F4F4F4;
+  --brand-white: #FFFFFF;
+  --brand-ink: #1E1E1E;
+  --brand-ink-2: #313131;
+  --brand-grey-700: #4C4C4C;
+  --brand-grey-500: #7A7A7A;
+  --brand-grey-300: #C4C4C4;
+  --brand-grey-200: #DCDCDC;
+  --brand-grey-100: #F0F0F0;
+
+  /* Accents */
+  --brand-cyan: #00D6FF;
+  --brand-orange: #EF9300;
+  --brand-magenta: #BB008E;
+  --brand-purple: #A554FB;
+  --brand-red: #D44325;
+  --brand-pink: #FD9EB3;
+
+  /* Type */
+  --font-body: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Retail-Supermarket-Grocery Sans", "Poppins", system-ui, sans-serif;
+
+  /* Radius */
+  --radius-pill: 9999px;
+  --radius-lg: 24px;
+  --radius-md: 12px;
+  --radius-sm: 5px;
+
+  /* Elevation */
+  --shadow-sm: 0 0 4px rgba(0, 0, 0, .08);
+  --shadow-card: 0 4px 30px rgba(0, 0, 0, .08);
+  --shadow-pop: 0 10px 25px rgba(0, 0, 0, .12);
+  --shadow-modal: 0 20px 40px rgba(0, 0, 0, .18);
+
+  /* Spacing scale */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
+
+  --container: 1240px;
+}

@@ -1,0 +1,204 @@
+# CPU-only deployment of the CV Lab app for any CPU-only Kubernetes cluster.
+#
+# - Namespace: cv-lab-cpu-only
+# - Compute:   CPU only (no GPU required) — DEVICE=cpu
+# - Storage:   local backend on RWO PVCs (no S3/object store needed)
+# - Runtime:   stock python:3.12 image; deps (incl. CPU torch) pip-installed onto
+#              a PVC, so no custom image/registry is required.
+# - Source:    delivered via the `cvlab-src` ConfigMap tarball (registry-free):
+#     tar -czf cvlab-src.tgz -C cv-lab backend frontend
+#     kubectl -n cv-lab-cpu-only create configmap cvlab-src --from-file=cvlab-src.tgz=cvlab-src.tgz
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cv-lab-cpu-only
+  labels:
+    app.kubernetes.io/part-of: retail-supermarket-grocery-cv-lab
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cvlab-deps
+  namespace: cv-lab-cpu-only
+spec:
+  accessModes: ["ReadWriteOnce"]
+  # Change to a ReadWriteOnce StorageClass available on your cluster
+  # (e.g. `standard`, `gp2`, `nutanix-volume`, ...). `kubectl get storageclass`.
+  storageClassName: nutanix-volume
+  resources:
+    requests:
+      storage: 12Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cvlab-data
+  namespace: cv-lab-cpu-only
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: nutanix-volume
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cv-lab
+  namespace: cv-lab-cpu-only
+  labels:
+    app: cv-lab
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate            # RWO volumes attach to one pod at a time
+  selector:
+    matchLabels:
+      app: cv-lab
+  template:
+    metadata:
+      labels:
+        app: cv-lab
+    spec:
+      securityContext:
+        fsGroup: 0
+      initContainers:
+        - name: setup
+          image: python:3.12
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Extracting application source..."
+              mkdir -p /app
+              tar -xzf /src/cvlab-src.tgz -C /app
+              # Reconcile deps every start: pip skips already-satisfied packages
+              # in /deps and only installs new/changed requirements. CPU torch
+              # comes from the PyTorch CPU wheel index.
+              echo "Reconciling Python deps onto PVC (CPU build)..."
+              pip install --no-cache-dir --target=/deps \
+                --extra-index-url https://download.pytorch.org/whl/cpu \
+                -r /app/backend/requirements.txt
+              touch /deps/.installed
+              echo "Dependencies reconciled."
+              # ultralytics pulls full opencv-python (needs libGL). Force the
+              # headless build so no system GL libraries are required.
+              echo "Enforcing headless OpenCV..."
+              rm -rf /deps/cv2 /deps/opencv_python.libs \
+                /deps/opencv_python-*.dist-info /deps/opencv_python_headless-*.dist-info || true
+              pip install --no-cache-dir --target=/deps --no-deps opencv-python-headless==4.10.0.84
+              echo "Ensuring YOLO weights..."
+              mkdir -p /deps/models
+              if [ ! -f /deps/models/yolov8n.pt ]; then
+                PYTHONPATH=/deps python -c "from ultralytics import YOLO; YOLO('/deps/models/yolov8n.pt')"
+              fi
+          volumeMounts:
+            - { name: src, mountPath: /src }
+            - { name: deps, mountPath: /deps }
+            - { name: app, mountPath: /app }
+      containers:
+        - name: cv-lab
+          image: python:3.12
+          workingDir: /app/backend
+          command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+          env:
+            - { name: PYTHONPATH, value: /deps }
+            - { name: DEVICE, value: "cpu" }
+            # RTSP over TCP + 8s open timeout (microseconds) for live stream sources.
+            - { name: OPENCV_FFMPEG_CAPTURE_OPTIONS, value: "rtsp_transport;tcp|stimeout;8000000" }
+            - { name: STORAGE_BACKEND, value: "local" }
+            - { name: LOCAL_STORAGE_DIR, value: "/data" }
+            - { name: MODELS_DIR, value: /deps/models }
+            - { name: PERSON_MODEL, value: yolov8n.pt }
+            - { name: TARGET_FPS, value: "10" }
+            - { name: MAX_STREAM_WIDTH, value: "800" }
+            - { name: FRONTEND_DIR, value: /app/frontend }
+            # LLM endpoint for the agentic-ops layer (any OpenAI-compatible API,
+            # e.g. Nutanix Enterprise AI / NAI, vLLM, Ollama, OpenAI).
+            # Create the Secret first:
+            #   kubectl -n cv-lab-cpu-only create secret generic nai-credentials \
+            #     --from-literal=NAI_BASE_URL=https://your-llm-endpoint/v1 \
+            #     --from-literal=NAI_API_KEY=<key> \
+            #     --from-literal=NAI_MODEL=<model-name>
+            - name: NAI_BASE_URL
+              valueFrom: { secretKeyRef: { name: nai-credentials, key: NAI_BASE_URL } }
+            - name: NAI_API_KEY
+              valueFrom: { secretKeyRef: { name: nai-credentials, key: NAI_API_KEY } }
+            - name: NAI_MODEL
+              valueFrom: { secretKeyRef: { name: nai-credentials, key: NAI_MODEL } }
+            - { name: NAI_VERIFY_SSL, value: "false" }
+          ports:
+            - containerPort: 8000
+          startupProbe:                # allow up to 12 min for first-run install
+            httpGet: { path: /healthz, port: 8000 }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 72
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 4
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests: { cpu: "1", memory: 2Gi }
+            limits: { cpu: "4", memory: 6Gi }
+          volumeMounts:
+            - { name: deps, mountPath: /deps }
+            - { name: app, mountPath: /app }
+            - { name: data, mountPath: /data }
+      volumes:
+        - name: src
+          configMap:
+            name: cvlab-src
+        - name: deps
+          persistentVolumeClaim:
+            claimName: cvlab-deps
+        - name: data
+          persistentVolumeClaim:
+            claimName: cvlab-data
+        - name: app
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cv-lab
+  namespace: cv-lab-cpu-only
+  labels:
+    app: cv-lab
+spec:
+  type: ClusterIP
+  selector:
+    app: cv-lab
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cv-lab
+  namespace: cv-lab-cpu-only
+spec:
+  # Change to your cluster's ingress class (e.g. nginx, traefik).
+  ingressClassName: kommander-traefik
+  rules:
+    - host: cv-lab.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cv-lab
+                port:
+                  number: 80

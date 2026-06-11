@@ -1,0 +1,5 @@
+# Model weights are large; keep the folder, ignore the binaries.
+*.pt
+*.onnx
+*.engine
+!.gitignore

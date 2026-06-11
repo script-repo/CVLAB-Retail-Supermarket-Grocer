@@ -1,0 +1,201 @@
+# GPU deployment of the CV Lab app for a GPU-enabled Kubernetes cluster.
+# Requires the NVIDIA GPU Operator (or equivalent device plugin).
+#
+# - Namespace: cv-lab
+# - Storage:   local backend on RWO PVCs (no S3/object store needed here)
+# - GPU:       schedules onto a GPU node (toleration + nvidia.com/gpu: 1)
+# - Runtime:   official CUDA PyTorch image so torch ships with CUDA; the rest of
+#              the deps are pip-installed onto a PVC (pip skips torch/torchvision
+#              because the base image already satisfies them).
+# - Source:    delivered via the `cvlab-src` ConfigMap tarball (registry-free):
+#     tar -czf cvlab-src.tgz -C cv-lab backend frontend
+#     kubectl -n cv-lab create configmap cvlab-src --from-file=cvlab-src.tgz=cvlab-src.tgz
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cv-lab
+  labels:
+    app.kubernetes.io/part-of: retail-supermarket-grocery-cv-lab
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cvlab-deps
+  namespace: cv-lab
+spec:
+  accessModes: ["ReadWriteOnce"]
+  # Change to a ReadWriteOnce StorageClass available on your cluster.
+  storageClassName: nutanix-volume
+  resources:
+    requests:
+      storage: 12Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cvlab-data
+  namespace: cv-lab
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: nutanix-volume
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cv-lab
+  namespace: cv-lab
+  labels:
+    app: cv-lab
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate            # RWO volumes attach to one pod at a time
+  selector:
+    matchLabels:
+      app: cv-lab
+  template:
+    metadata:
+      labels:
+        app: cv-lab
+    spec:
+      securityContext:
+        fsGroup: 0
+      # Schedule onto the GPU node (tainted nvidia.com/gpu:NoSchedule).
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      # Optional: pin to a specific GPU model. Remove or edit for your hardware
+      # (`kubectl get nodes -o json | jq '.items[].metadata.labels'`).
+      nodeSelector:
+        nvidia.com/gpu.product: Tesla-T4
+      initContainers:
+        - name: setup
+          image: pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Extracting application source..."
+              mkdir -p /app
+              tar -xzf /src/cvlab-src.tgz -C /app
+              # Reconcile deps every start: pip skips already-satisfied packages
+              # in /deps and only installs new/changed requirements (e.g. httpx).
+              echo "Reconciling Python deps onto PVC (torch from PyPI is the CUDA build)..."
+              pip install --no-cache-dir --target=/deps -r /app/backend/requirements.txt
+              touch /deps/.installed
+              echo "Dependencies reconciled."
+              # ultralytics pulls full opencv-python (needs libGL). Force the
+              # headless build so no system GL libraries are required.
+              echo "Enforcing headless OpenCV..."
+              rm -rf /deps/cv2 /deps/opencv_python.libs \
+                /deps/opencv_python-*.dist-info /deps/opencv_python_headless-*.dist-info || true
+              pip install --no-cache-dir --target=/deps --no-deps opencv-python-headless==4.10.0.84
+              echo "Ensuring YOLO weights..."
+              mkdir -p /deps/models
+              if [ ! -f /deps/models/yolov8n.pt ]; then
+                PYTHONPATH=/deps python -c "from ultralytics import YOLO; YOLO('/deps/models/yolov8n.pt')"
+              fi
+          volumeMounts:
+            - { name: src, mountPath: /src }
+            - { name: deps, mountPath: /deps }
+            - { name: app, mountPath: /app }
+      containers:
+        - name: cv-lab
+          image: pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+          workingDir: /app/backend
+          command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+          env:
+            # /deps first on the path; torch/torchvision resolve from the base image.
+            - { name: PYTHONPATH, value: /deps }
+            - { name: DEVICE, value: "cuda:0" }     # force GPU inference
+            # RTSP over TCP + 8s open timeout (microseconds) for live stream sources.
+            - { name: OPENCV_FFMPEG_CAPTURE_OPTIONS, value: "rtsp_transport;tcp|stimeout;8000000" }
+            - { name: STORAGE_BACKEND, value: "local" }
+            - { name: LOCAL_STORAGE_DIR, value: "/data" }
+            - { name: MODELS_DIR, value: /deps/models }
+            - { name: PERSON_MODEL, value: yolov8n.pt }
+            - { name: TARGET_FPS, value: "15" }
+            - { name: MAX_STREAM_WIDTH, value: "960" }
+            - { name: FRONTEND_DIR, value: /app/frontend }
+          ports:
+            - containerPort: 8000
+          startupProbe:                # allow up to 10 min for first-run install
+            httpGet: { path: /healthz, port: 8000 }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 4
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests: { cpu: "1", memory: 4Gi }
+            limits:
+              cpu: "4"
+              memory: 8Gi
+              nvidia.com/gpu: 1
+          volumeMounts:
+            - { name: deps, mountPath: /deps }
+            - { name: app, mountPath: /app }
+            - { name: data, mountPath: /data }
+      volumes:
+        - name: src
+          configMap:
+            name: cvlab-src
+        - name: deps
+          persistentVolumeClaim:
+            claimName: cvlab-deps
+        - name: data
+          persistentVolumeClaim:
+            claimName: cvlab-data
+        - name: app
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cv-lab
+  namespace: cv-lab
+  labels:
+    app: cv-lab
+spec:
+  type: ClusterIP
+  selector:
+    app: cv-lab
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cv-lab
+  namespace: cv-lab
+spec:
+  # Change to your cluster's ingress class (e.g. nginx, traefik).
+  ingressClassName: kommander-traefik
+  rules:
+    - host: cv-lab.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cv-lab
+                port:
+                  number: 80

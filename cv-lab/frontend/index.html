@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Retail-Supermarket-Grocery · CV Live Analysis</title>
+  <meta name="description" content="Live computer-vision analysis for Retail-Supermarket-Grocery retail use cases." />
+  <link rel="stylesheet" href="assets/theme.css" />
+  <link rel="stylesheet" href="assets/analyze.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="28" height="28" fill="none">
+            <path d="M16 2C9 6 6 11 6 17a10 10 0 0 0 20 0c0-2-1-4-2-6-1 4-4 6-8 6 3-4 4-9 0-15Z" fill="#3EB36C"/>
+          </svg>
+        </span>
+        <div class="brand-text">
+          <strong>Retail-Supermarket-Grocery</strong>
+          <span>CV Live Analysis</span>
+        </div>
+      </div>
+      <a class="header-link" href="library.html">Use-case library &rarr;</a>
+    </div>
+  </header>
+
+  <main class="app">
+    <!-- LEFT: scrollable, collapsible use-case selection -->
+    <aside class="pane col-usecases" id="usecasesPane">
+      <div class="pane-head">
+        <button class="pane-toggle" id="toggleUsecases" title="Collapse panel" aria-label="Collapse use cases">&laquo;</button>
+        <h2>Use case</h2>
+        <span class="pane-tab" aria-hidden="true">Use cases</span>
+      </div>
+      <div class="pane-body">
+        <div class="usecase-list" id="usecaseList"></div>
+
+        <!-- Source selection (bottom of the use-case pane) -->
+        <section class="block video-block" id="videoBlock">
+          <h2>Source</h2>
+          <div class="source-toggle" id="sourceToggle">
+            <button type="button" class="src-btn is-active" data-source="video">Saved video</button>
+            <button type="button" class="src-btn" data-source="camera">Camera</button>
+            <button type="button" class="src-btn" data-source="rtsp">RTSP</button>
+          </div>
+
+          <!-- VIDEO mode -->
+          <div class="source-panel" id="srcVideo">
+            <label class="file-drop" id="drop">
+              <input type="file" id="fileInput" accept="video/*" hidden />
+              <span id="dropText">Click or drop a video to upload</span>
+              <div class="progress" id="uploadProgress" hidden><div class="bar"></div></div>
+            </label>
+            <div class="saved-head">
+              <span>Saved videos</span>
+              <button class="link-btn" id="refreshVideos">Refresh</button>
+            </div>
+            <div class="saved-list" id="savedList"><p class="muted">No videos yet.</p></div>
+          </div>
+
+          <!-- CAMERA mode -->
+          <div class="source-panel" id="srcCamera" hidden>
+            <select id="cameraSelect" class="src-select">
+              <option value="">Default camera</option>
+            </select>
+            <button type="button" class="btn ghost" id="cameraEnable">Enable camera</button>
+            <p class="muted small" id="cameraHint">Grant camera access, draw zones if needed, then Start analysis.</p>
+            <video id="cameraPreview" playsinline muted hidden></video>
+          </div>
+
+          <!-- Network stream mode -->
+          <div class="source-panel" id="srcRtsp" hidden>
+            <input type="url" id="rtspUrl" class="src-input" placeholder="rtsp://... or https://.../video.mjpg" />
+            <div class="src-row">
+              <button type="button" class="btn ghost" id="rtspConnect">Connect</button>
+              <button type="button" class="btn ghost" id="rtspFav" title="Set this stream as the favorite for the selected use case">&#9734; Favorite</button>
+            </div>
+            <p class="muted small" id="rtspHint">The cluster must be able to reach this stream over the network.</p>
+          </div>
+        </section>
+      </div>
+    </aside>
+
+    <!-- CENTER: large viewer + run controls + metrics + video selection/upload -->
+    <section class="col-center">
+      <div class="panel viewer-card">
+        <div class="stage" id="stage">
+          <img id="frame" alt="Live analysis output" />
+          <canvas id="overlay"></canvas>
+        </div>
+
+        <div class="run-bar">
+          <div class="run-actions">
+            <button class="btn primary" id="startBtn" disabled>Start analysis</button>
+            <button class="btn ghost" id="pauseBtn" disabled>Pause</button>
+            <button class="btn danger" id="stopBtn" disabled>Stop</button>
+          </div>
+          <p class="status" id="status">Select a video and use case to begin.</p>
+        </div>
+
+        <div class="metrics">
+          <div class="metric-headline" id="metricHeadline">&nbsp;</div>
+          <div class="metric-grid" id="metricGrid"></div>
+        </div>
+      </div>
+
+      <!-- Agentic ops: live agent activity + work orders (driven by /ws/agent) -->
+      <div class="panel agent-card" id="agentCard">
+        <div class="agent-head">
+          <h2>Agentic Ops
+            <span class="nai-badge" id="naiBadge" title="NAI inference endpoint">
+              <span class="nai-dot" id="naiDot"></span> NAI &middot; <span id="naiModel">&hellip;</span>
+            </span>
+            <span class="sim-badge" title="Roster, work orders and notifications are simulated for the demo">simulated systems</span>
+          </h2>
+          <button class="btn ghost" id="reportBtn">Generate shift report</button>
+        </div>
+        <div class="agent-cols">
+          <div class="agent-col">
+            <h3>Agent activity</h3>
+            <div class="agent-feed" id="agentFeed">
+              <p class="muted small">Waiting for CV events&hellip; start an analysis and the agent responds to sustained alerts.</p>
+            </div>
+          </div>
+          <div class="agent-col">
+            <h3>Work orders</h3>
+            <div class="wo-list" id="woList">
+              <p class="muted small">No work orders yet.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: scrollable, collapsible zones + tuning for the selected use case -->
+    <aside class="pane col-config" id="configPane">
+      <div class="pane-head">
+        <span class="pane-tab" aria-hidden="true">Settings</span>
+        <h2>Settings</h2>
+        <button class="pane-toggle" id="toggleConfig" title="Collapse panel" aria-label="Collapse settings">&raquo;</button>
+      </div>
+      <div class="pane-body">
+        <section class="block gpu-block" id="gpuBlock">
+          <div class="gpu-head">
+            <h2>GPU</h2>
+            <span class="gpu-badge" id="gpuBadge">…</span>
+          </div>
+          <p class="gpu-name muted small" id="gpuName">Detecting accelerator…</p>
+          <div class="gpu-meter">
+            <div class="gpu-meter-head"><span>Compute</span><b id="gpuUtilVal">—</b></div>
+            <div class="meter"><div class="meter-fill" id="gpuUtilBar"></div></div>
+          </div>
+          <div class="gpu-meter">
+            <div class="gpu-meter-head"><span>Memory</span><b id="gpuMemVal">—</b></div>
+            <div class="meter"><div class="meter-fill" id="gpuMemBar"></div></div>
+          </div>
+          <ul class="gpu-stats" id="gpuStats"></ul>
+        </section>
+
+        <p class="config-empty muted small" id="configEmpty">Select a use case to configure its zones or tuning here.</p>
+
+        <section class="block" id="zoneBlock" hidden>
+          <h2>Zones</h2>
+          <p class="muted small">Click the frame to add points, then <b>double-click</b> or press <b>Finish zone</b> to close it. Optional &mdash; sensible defaults are used if you skip this.</p>
+          <div class="zone-actions">
+            <button class="btn ghost" id="zoneFinish">Finish zone</button>
+            <button class="btn ghost" id="zoneUndo">Undo point</button>
+            <button class="btn ghost" id="zoneClear">Clear zones</button>
+          </div>
+          <ul class="zone-chips" id="zoneChips"></ul>
+        </section>
+
+        <section class="block" id="paramBlock" hidden>
+          <h2>Tuning</h2>
+          <div class="params" id="params"></div>
+        </section>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Shift report modal -->
+  <div class="report-modal" id="reportModal" hidden>
+    <div class="report-box">
+      <div class="report-head">
+        <h2>Shift Report <span class="muted small">generated by NAI</span></h2>
+        <button class="btn ghost" id="reportClose">Close</button>
+      </div>
+      <div class="report-body" id="reportBody"><p class="muted">Generating&hellip;</p></div>
+    </div>
+  </div>
+
+  <script src="assets/api.js"></script>
+  <script src="assets/settings.js"></script>
+  <script src="assets/analyze.js"></script>
+  <script src="assets/agent.js"></script>
+</body>
+</html>

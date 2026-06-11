@@ -1,0 +1,147 @@
+# Registry-free deployment: runs the app on a stock python:3.12 base image.
+# The application source is delivered via the `cvlab-src` ConfigMap (a tarball),
+# and Python dependencies are pip-installed once onto a persistent volume.
+# Use this when you cannot build/push a custom image (no local Docker / registry).
+#
+# Source ConfigMap is created at deploy time:
+#   tar -czf cvlab-src.tgz -C cv-lab backend frontend
+#   kubectl -n retail-supermarket-grocery-cv create configmap cvlab-src --from-file=cvlab-src.tgz=cvlab-src.tgz
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cv-lab
+  namespace: retail-supermarket-grocery-cv
+  labels:
+    app: cv-lab
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate            # RWO deps volume can attach to one pod at a time
+  selector:
+    matchLabels:
+      app: cv-lab
+  template:
+    metadata:
+      labels:
+        app: cv-lab
+    spec:
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+        - name: setup
+          image: python:3.12
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Extracting application source..."
+              mkdir -p /app
+              tar -xzf /src/cvlab-src.tgz -C /app
+              if [ ! -f /deps/.installed ]; then
+                echo "Installing Python dependencies (first run, this takes a few minutes)..."
+                pip install --no-cache-dir --target=/deps \
+                  --extra-index-url https://download.pytorch.org/whl/cpu \
+                  -r /app/backend/requirements.txt
+                touch /deps/.installed
+                echo "Dependencies installed."
+              else
+                echo "Dependencies already present; skipping install."
+              fi
+              # ultralytics drags in full opencv-python (needs libGL). Remove it and
+              # install ONLY the headless build so no system GL libs are needed.
+              echo "Enforcing headless OpenCV..."
+              rm -rf /deps/cv2 /deps/opencv_python.libs \
+                /deps/opencv_python-*.dist-info /deps/opencv_python_headless-*.dist-info
+              pip install --no-cache-dir --target=/deps --no-deps \
+                opencv-python-headless==4.10.0.84
+              # Fetch the YOLO weights AFTER the headless fix so importing ultralytics
+              # (which imports cv2) succeeds. Idempotent: only downloads if missing.
+              echo "Ensuring YOLO weights..."
+              mkdir -p /deps/models
+              if [ ! -f /deps/models/yolov8n.pt ]; then
+                PYTHONPATH=/deps python -c "from ultralytics import YOLO; YOLO('/deps/models/yolov8n.pt')"
+              fi
+          volumeMounts:
+            - { name: src, mountPath: /src }
+            - { name: deps, mountPath: /deps }
+            - { name: app, mountPath: /app }
+      containers:
+        - name: cv-lab
+          image: python:3.12
+          workingDir: /app/backend
+          command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+          env:
+            - { name: PYTHONPATH, value: /deps }
+            - { name: STORAGE_BACKEND, value: "s3" }
+            - { name: S3_USE_PATH_STYLE, value: "true" }
+            - { name: S3_VERIFY_SSL, value: "false" }
+            # NOTE: this registry-free path installs CPU torch on a stock image,
+            # so DEVICE stays cpu here. For GPU inference use the image-based
+            # deployment (backend-deployment.yaml: DEVICE=cuda:0 + nvidia.com/gpu).
+            - { name: DEVICE, value: "cpu" }
+            - { name: TARGET_FPS, value: "10" }
+            - { name: MAX_STREAM_WIDTH, value: "800" }
+            - { name: PERSON_MODEL, value: /deps/models/yolov8n.pt }
+            - { name: MODELS_DIR, value: /deps/models }
+            - { name: FRONTEND_DIR, value: /app/frontend }
+            # Agentic state (events/work orders SQLite) must outlive the pod:
+            # keep it on the deps PVC, not the ephemeral /app emptyDir.
+            - { name: LOCAL_STORAGE_DIR, value: /deps/agentic-data }
+            # NAI (Nutanix Enterprise AI) endpoint for the agentic-ops layer.
+            # Create the Secret first: see nai-secret.example.yaml
+            - name: NAI_BASE_URL
+              valueFrom: { secretKeyRef: { name: nai-credentials, key: NAI_BASE_URL } }
+            - name: NAI_API_KEY
+              valueFrom: { secretKeyRef: { name: nai-credentials, key: NAI_API_KEY } }
+            - name: NAI_MODEL
+              valueFrom: { secretKeyRef: { name: nai-credentials, key: NAI_MODEL } }
+            - { name: NAI_VERIFY_SSL, value: "false" }
+            # S3 wiring from the ObjectBucketClaim ConfigMap + Secret
+            - name: BUCKET_HOST
+              valueFrom: { configMapKeyRef: { name: retail-supermarket-grocery-cv-bucket, key: BUCKET_HOST } }
+            - name: BUCKET_PORT
+              valueFrom: { configMapKeyRef: { name: retail-supermarket-grocery-cv-bucket, key: BUCKET_PORT } }
+            - name: BUCKET_NAME
+              valueFrom: { configMapKeyRef: { name: retail-supermarket-grocery-cv-bucket, key: BUCKET_NAME } }
+            - name: S3_ENDPOINT
+              value: "http://$(BUCKET_HOST):$(BUCKET_PORT)"
+            - name: S3_BUCKET
+              value: "$(BUCKET_NAME)"
+            - name: S3_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: retail-supermarket-grocery-cv-bucket, key: AWS_ACCESS_KEY_ID } }
+            - name: S3_SECRET_KEY
+              valueFrom: { secretKeyRef: { name: retail-supermarket-grocery-cv-bucket, key: AWS_SECRET_ACCESS_KEY } }
+          ports:
+            - containerPort: 8000
+          startupProbe:                # allow up to 10 min for first-run install
+            httpGet: { path: /healthz, port: 8000 }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:              # tolerant: CPU inference can briefly delay the loop
+            httpGet: { path: /healthz, port: 8000 }
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 4
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests: { cpu: "1", memory: 2Gi }
+            limits: { cpu: "4", memory: 6Gi }
+          volumeMounts:
+            - { name: deps, mountPath: /deps }
+            - { name: app, mountPath: /app }
+      volumes:
+        - name: src
+          configMap:
+            name: cvlab-src
+        - name: deps
+          persistentVolumeClaim:
+            claimName: cvlab-deps
+        - name: app
+          emptyDir: {}

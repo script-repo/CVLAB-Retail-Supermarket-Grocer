@@ -1,0 +1,61 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+.python-version
+
+# --- Secrets (NEVER commit) ---
+.env
+.env.*
+!.env.example
+**/backend/.env
+deploy/k8s/nai-secret.yaml
+deploy/k8s/objects-secret.yaml
+*.pem
+*.key
+*-credentials.yaml
+kubeconfig
+*.kubeconfig
+
+# --- Runtime data / artifacts ---
+data/
+**/backend/data/
+_s3cache/
+*.sqlite
+*.db
+
+# --- Model weights (downloaded on first run) ---
+*.pt
+*.onnx
+*.engine
+**/backend/models/*.pt
+
+# --- Media / uploads ---
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+
+# --- Build / packaging ---
+*.tgz
+*.tar.gz
+dist/
+build/
+node_modules/
+
+# --- Test / tooling ---
+.pytest_cache/
+.coverage
+htmlcov/
+e2e_out*.txt
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

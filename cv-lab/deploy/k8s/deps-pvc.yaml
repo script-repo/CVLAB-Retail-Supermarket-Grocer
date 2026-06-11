@@ -1,0 +1,14 @@
+# Persistent volume for the pip-installed dependencies + cached model weights,
+# so the (slow) install happens only on first start.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cvlab-deps
+  namespace: retail-supermarket-grocery-cv
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: nutanix-volume
+  resources:
+    requests:
+      storage: 8Gi

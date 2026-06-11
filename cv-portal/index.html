@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Retail-Supermarket-Grocery · Computer Vision Use-Case Portal</title>
+  <meta name="description" content="Retail-Supermarket-Grocery retail computer vision use-case catalogue, footage plans, demo tools, and recording guidance." />
+  <link rel="stylesheet" href="assets/theme.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="28" height="28" fill="none">
+            <path d="M16 2C9 6 6 11 6 17a10 10 0 0 0 20 0c0-2-1-4-2-6-1 4-4 6-8 6 3-4 4-9 0-15Z" fill="#3EB36C"/>
+          </svg>
+        </span>
+        <div class="brand-text">
+          <strong>Retail-Supermarket-Grocery</strong>
+          <span>Computer Vision Portal</span>
+        </div>
+      </div>
+      <nav class="tabs" id="tabs">
+        <button class="tab is-active" data-view="usecases">Use Cases</button>
+        <button class="tab" data-view="tools">Demo Tools</button>
+        <button class="tab" data-view="recording">Recording Guide</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <p class="eyebrow">Retail Edge AI</p>
+      <h1>Computer Vision Use-Case Library</h1>
+      <p class="hero-sub">Twenty grocery computer-vision scenarios — each with a camera-ready footage plan, overlay spec, and demo-tool path. Built to record, review, and present.</p>
+      <div class="hero-stats" id="heroStats"></div>
+    </div>
+  </section>
+
+  <main class="container">
+    <!-- USE CASES VIEW -->
+    <section id="view-usecases" class="view is-active">
+      <div class="toolbar">
+        <div class="search">
+          <input type="search" id="search" placeholder="Search use cases, overlays, actions…" autocomplete="off" />
+        </div>
+        <div class="filters" id="filters"></div>
+      </div>
+      <div class="grid" id="cards"></div>
+      <p class="empty" id="empty" hidden>No use cases match your filters.</p>
+    </section>
+
+    <!-- TOOLS VIEW -->
+    <section id="view-tools" class="view">
+      <h2 class="view-title">Public Demo Tools</h2>
+      <p class="view-lead">Quick paths for live overlays during demos. Upload a recorded loop or use a webcam. Verify Space URLs before presenting — Hugging Face Spaces can rotate.</p>
+      <div class="grid tools-grid" id="tools"></div>
+    </section>
+
+    <!-- RECORDING VIEW -->
+    <section id="view-recording" class="view">
+      <h2 class="view-title">Global Recording Guidance</h2>
+      <div class="rec-layout">
+        <div class="rec-card">
+          <h3>Capture Settings</h3>
+          <table class="rec-table" id="recSettings"></table>
+        </div>
+        <div class="rec-card">
+          <h3>Ground Rules</h3>
+          <ul class="rec-list" id="recGuidance"></ul>
+          <div class="rec-note">
+            <strong>Loop construction:</strong> open on the normal state, trigger the event mid-clip,
+            then hold the resolved/alert state for 2–3 seconds so overlays and banners read clearly.
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Detail modal -->
+  <div class="modal" id="modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal-close" data-close aria-label="Close">&times;</button>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container">
+      <span>Retail-Supermarket-Grocery Computer Vision Portal</span>
+      <span class="muted">Mock-store footage · actor consent · no real customer faces or payment cards</span>
+    </div>
+  </footer>
+
+  <script src="assets/data.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

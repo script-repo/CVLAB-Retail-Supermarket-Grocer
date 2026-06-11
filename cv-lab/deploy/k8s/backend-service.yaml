@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cv-lab
+  namespace: retail-supermarket-grocery-cv
+  labels:
+    app: cv-lab
+spec:
+  type: ClusterIP
+  selector:
+    app: cv-lab
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000

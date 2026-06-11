@@ -1,0 +1,53 @@
+# Local development stack: MinIO (S3 stand-in for Nutanix Objects) + backend.
+# From cv-lab/deploy:  docker compose up --build
+# Then open http://localhost:8000
+services:
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Console
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  createbuckets:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until (mc alias set local http://minio:9000 minioadmin minioadmin) do echo waiting; sleep 2; done;
+      mc mb -p local/retail-supermarket-grocery-cv;
+      exit 0;
+      "
+
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    depends_on:
+      - minio
+    environment:
+      STORAGE_BACKEND: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: retail-supermarket-grocery-cv
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_USE_PATH_STYLE: "true"
+      S3_VERIFY_SSL: "false"
+      TARGET_FPS: "12"
+      DEVICE: cpu
+    ports:
+      - "8000:8000"
+
+volumes:
+  minio-data:
