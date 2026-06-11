@@ -57,7 +57,7 @@ self-contained Python file.
 
 | Live analysis | Use-case portal |
 |---|---|
-| live-analysis.png | portal.png |
+| ![Live analysis](docs/images/live-analysis.png) | ![Use-case portal](docs/images/portal.png) |
 
 ## Quick start (Docker)
 
