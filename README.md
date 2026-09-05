@@ -13,6 +13,9 @@ self-contained Python file.
 > Status: reference/demo project. Designed for learning, prototyping, and demos —
 > not a turnkey production surveillance system.
 
+Live lab deployment: [http://10.42.156.95:30008](http://10.42.156.95:30008)
+(`db-project-002`, NodePort `30008`, one replica).
+
 ---
 
 ## Table of contents
@@ -27,7 +30,7 @@ self-contained Python file.
 - [Repository layout](#repository-layout)
 - [Documentation](#documentation)
 - [Configuration](#configuration)
-- [Deploying to Kubernetes](#deploying-to-kubernetes)
+- [Deploying](#deploying)
 - [Tech stack](#tech-stack)
 - [License](#license)
 - [Security & privacy](#security--privacy)
@@ -166,8 +169,9 @@ same flow runs on deterministic local logic, so it always works offline. See
 ├── cv-lab/            # the application
 │   ├── backend/       # FastAPI + CV pipeline + use-case analyzers
 │   ├── frontend/      # live-analysis UI (vanilla HTML/CSS/JS)
-│   └── deploy/        # docker-compose + Kubernetes manifests
+│   └── deploy/        # docker-compose + legacy hand-apply k8s manifests
 ├── cv-portal/         # static use-case library/portal site
+├── deploy/            # live GitOps overlay + Flux bootstrap
 ├── docs/              # documentation (start here)
 ├── .env.example       # copy to cv-lab/backend/.env
 └── LICENSE            # AGPL-3.0
@@ -178,7 +182,8 @@ same flow runs on deterministic local logic, so it always works offline. See
 - [Getting started](docs/GETTING_STARTED.md) — plain-language setup + troubleshooting
 - [Architecture](docs/ARCHITECTURE.md) — components and data flow
 - [Configuration](docs/CONFIGURATION.md) — every environment variable
-- [Deployment](docs/DEPLOYMENT.md) — Docker, local, Kubernetes (CPU & GPU)
+- [Deployment](docs/DEPLOYMENT.md) — Docker, local, and the legacy k8s path
+- [GitOps on NKP](docs/gitops-nkp-pipeline.md) — live GitHub → GHCR → Flux path
 - [Use cases](docs/USE_CASES.md) — the 20 analyzers in detail
 - [Agentic ops](docs/AGENTIC_OPS.md) — the optional LLM layer
 - [Adding a use case](docs/ADDING_A_USE_CASE.md) — extend the pipeline
@@ -199,11 +204,23 @@ useful:
 Full reference: [docs/CONFIGURATION.md](docs/CONFIGURATION.md). Copy
 [.env.example](.env.example) to `cv-lab/backend/.env` to begin.
 
-## Deploying to Kubernetes
+## Deploying
 
-Manifests live in `cv-lab/deploy/k8s/` with CPU and GPU variants and a
-registry-free path (ship source via a ConfigMap). Full walkthrough:
-[cv-lab/DEPLOYMENT.md](cv-lab/DEPLOYMENT.md).
+The live path is GitOps:
+
+1. Push to `main`.
+2. GitHub Actions publishes `ghcr.io/script-repo/cvlab-retail-supermarket-grocer/cvlab`.
+3. The workflow writes an immutable `sha-<commit>` tag into
+   `deploy/gitops/db-project-002/kustomization.yaml`.
+4. Flux reconciles the overlay into `db-project-002`.
+
+See [`deploy/gitops/README.md`](deploy/gitops/README.md) for the short operator
+notes. The full path — commit, GitHub Actions, GHCR, Flux, NKP, and when to
+use a PVC — is documented in
+[`docs/gitops-nkp-pipeline.md`](docs/gitops-nkp-pipeline.md).
+
+`cv-lab/deploy/k8s/` is the older hand-apply method. Do not apply it into
+`db-project-002`.
 
 ## Tech stack
 

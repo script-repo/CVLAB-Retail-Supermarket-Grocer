@@ -1,8 +1,13 @@
 # Deployment
 
-Three ways to run the app, from easiest to most involved. For the full,
-step-by-step Kubernetes guide (including a registry-free ConfigMap path), see
-[`../cv-lab/DEPLOYMENT.md`](../cv-lab/DEPLOYMENT.md).
+The **live lab** on NKP is GitOps, not a hand `kubectl apply`. See
+[`gitops-nkp-pipeline.md`](gitops-nkp-pipeline.md) and
+[`../deploy/gitops/README.md`](../deploy/gitops/README.md). Do not apply
+`cv-lab/deploy/k8s/` into `db-project-002`.
+
+Three local / legacy ways to run the app, from easiest to most involved. For
+the full step-by-step hand-apply Kubernetes guide (including a registry-free
+ConfigMap path), see [`../cv-lab/DEPLOYMENT.md`](../cv-lab/DEPLOYMENT.md).
 
 ## 1. Docker Compose (local / demo)
 
@@ -33,7 +38,11 @@ Add `-e NAI_BASE_URL=... -e NAI_API_KEY=... -e NAI_MODEL=...` to enable the LLM.
 For GPU, use an NVIDIA runtime (`--gpus all`) and an image with CUDA PyTorch (see
 the GPU manifest), and set `DEVICE=cuda:0`.
 
-## 3. Kubernetes
+## 3. Kubernetes (legacy hand-apply)
+
+These manifests are **not** the live `db-project-002` path. They stay as a
+reference for registry-free or GPU experiments. Live delivery is
+[`gitops-nkp-pipeline.md`](gitops-nkp-pipeline.md).
 
 Manifests live in `cv-lab/deploy/k8s/`:
 
@@ -99,6 +108,5 @@ The repo ships GitHub Actions workflows under `.github/workflows/`:
 
 - `ci.yml` — installs deps and runs the import self-check on each push/PR.
 - `secret-scan.yml` — scans the tree for accidentally committed secrets.
-
-To publish container images, add a build-and-push job targeting your registry
-(e.g. GHCR) — a commented template is included in `ci.yml`.
+- `publish-cvlab.yml` — builds `linux/amd64`, pushes to GHCR, and writes the
+  immutable `sha-<commit>` tag into the GitOps overlay.

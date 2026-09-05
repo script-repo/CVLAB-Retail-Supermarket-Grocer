@@ -32,7 +32,15 @@ RUN mkdir -p /app/backend/models && cd /app/backend/models \
 
 WORKDIR /app/backend
 ENV FRONTEND_DIR=/app/frontend \
-    MODELS_DIR=/app/backend/models
+    MODELS_DIR=/app/backend/models \
+    LOCAL_STORAGE_DIR=/data
+
+RUN groupadd --gid 1001 cvlab \
+    && useradd --uid 1001 --gid cvlab --no-create-home --home-dir /app cvlab \
+    && mkdir -p /app/.ultralytics /data \
+    && chown -R cvlab:cvlab /app /data
+
+USER 1001
 
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
