@@ -13,9 +13,6 @@ self-contained Python file.
 > Status: reference/demo project. Designed for learning, prototyping, and demos —
 > not a turnkey production surveillance system.
 
-Live lab deployment: [http://10.42.156.95:30008](http://10.42.156.95:30008)
-(`db-project-002`, NodePort `30008`, one replica).
-
 ---
 
 ## Table of contents
@@ -206,21 +203,16 @@ Full reference: [docs/CONFIGURATION.md](docs/CONFIGURATION.md). Copy
 
 ## Deploying
 
-The live path is GitOps:
+The intended Kubernetes path is GitOps:
 
 1. Push to `main`.
-2. GitHub Actions publishes `ghcr.io/script-repo/cvlab-retail-supermarket-grocer/cvlab`.
-3. The workflow writes an immutable `sha-<commit>` tag into
-   `deploy/gitops/db-project-002/kustomization.yaml`.
-4. Flux reconciles the overlay into `db-project-002`.
+2. GitHub Actions publishes a container image to GHCR.
+3. The workflow writes an immutable `sha-<commit>` tag into the GitOps overlay.
+4. Flux reconciles that overlay into the target cluster namespace.
 
-See [`deploy/gitops/README.md`](deploy/gitops/README.md) for the short operator
-notes. The full path — commit, GitHub Actions, GHCR, Flux, NKP, and when to
-use a PVC — is documented in
-[`docs/gitops-nkp-pipeline.md`](docs/gitops-nkp-pipeline.md).
-
-`cv-lab/deploy/k8s/` is the older hand-apply method. Do not apply it into
-`db-project-002`.
+See [`deploy/gitops/README.md`](deploy/gitops/README.md) for operator notes
+and [`docs/gitops-nkp-pipeline.md`](docs/gitops-nkp-pipeline.md) for the full
+pipeline. `cv-lab/deploy/k8s/` is a legacy hand-apply method.
 
 ## Tech stack
 

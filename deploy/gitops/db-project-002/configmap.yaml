@@ -8,7 +8,3 @@ data:
   LOCAL_STORAGE_DIR: /data
   TARGET_FPS: "8"
   NAI_VERIFY_SSL: "false"
-
-  NKP_CLUSTER_NAME: nkp-cluster
-  NKP_API_SERVER: https://10.42.156.20:6443
-  NKP_NAMESPACE: db-project-002

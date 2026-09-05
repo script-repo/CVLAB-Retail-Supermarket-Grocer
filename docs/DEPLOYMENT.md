@@ -1,9 +1,9 @@
 # Deployment
 
-The **live lab** on NKP is GitOps, not a hand `kubectl apply`. See
+The intended Kubernetes path is GitOps, not a hand `kubectl apply`. See
 [`gitops-nkp-pipeline.md`](gitops-nkp-pipeline.md) and
 [`../deploy/gitops/README.md`](../deploy/gitops/README.md). Do not apply
-`cv-lab/deploy/k8s/` into `db-project-002`.
+`cv-lab/deploy/k8s/` into a Flux-managed namespace.
 
 Three local / legacy ways to run the app, from easiest to most involved. For
 the full step-by-step hand-apply Kubernetes guide (including a registry-free
@@ -40,8 +40,8 @@ the GPU manifest), and set `DEVICE=cuda:0`.
 
 ## 3. Kubernetes (legacy hand-apply)
 
-These manifests are **not** the live `db-project-002` path. They stay as a
-reference for registry-free or GPU experiments. Live delivery is
+These manifests are a legacy hand-apply path. They stay as a reference for
+registry-free or GPU experiments. Intended delivery is
 [`gitops-nkp-pipeline.md`](gitops-nkp-pipeline.md).
 
 Manifests live in `cv-lab/deploy/k8s/`:
