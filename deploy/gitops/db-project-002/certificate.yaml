@@ -1,0 +1,14 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cv-lab-tls
+  labels:
+    app.kubernetes.io/name: cv-lab
+    app.kubernetes.io/component: tls
+spec:
+  secretName: cv-lab-tls
+  dnsNames:
+    - cvlab.nutanix.local
+  issuerRef:
+    name: kommander-ca
+    kind: ClusterIssuer

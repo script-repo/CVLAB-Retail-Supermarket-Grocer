@@ -14,6 +14,9 @@ resources:
   - configmap.yaml
   - deployment.yaml
   - service.yaml
+  - certificate.yaml
+  - ingress.yaml
+
 
 images:
   - name: ghcr.io/script-repo/cvlab-retail-supermarket-grocer/cvlab

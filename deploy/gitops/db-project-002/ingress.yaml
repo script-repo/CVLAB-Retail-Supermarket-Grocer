@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cv-lab
+  labels:
+    app.kubernetes.io/name: cv-lab
+    app.kubernetes.io/component: ingress
+spec:
+  ingressClassName: kommander-traefik
+  tls:
+    - hosts:
+        - cvlab.nutanix.local
+      secretName: cv-lab-tls
+  rules:
+    - host: cvlab.nutanix.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cv-lab
+                port:
+                  number: 80
