@@ -2,9 +2,13 @@
 # Build context must be the cv-lab/ directory:
 #   docker build -f backend/Dockerfile -t retail-supermarket-grocery-cv-lab .
 #
-# CPU image by default. For GPU on NKP, switch the base image to an NVIDIA CUDA
-# runtime (e.g. nvidia/cuda:12.4.1-runtime-ubuntu22.04 + python) and request a
-# GPU in the k8s Deployment.
+# Single image, runs on CPU-only or GPU nodes. PyTorch's standard (CUDA-enabled)
+# wheel is installed instead of the CPU-only build, so torch.cuda.is_available()
+# is True when a GPU + NVIDIA driver are exposed to the container (via the
+# NVIDIA device plugin and a `nvidia.com/gpu` resource request in the k8s
+# Deployment) and False otherwise. The app's DEVICE=auto setting (see
+# docs/CONFIGURATION.md) picks CUDA when available and falls back to CPU
+# automatically — no separate GPU image or build is needed.
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -19,8 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY backend/requirements.txt backend/requirements.txt
-RUN pip install --extra-index-url https://download.pytorch.org/whl/cpu \
-        -r backend/requirements.txt
+RUN pip install -r backend/requirements.txt
 
 COPY backend backend
 COPY frontend frontend
