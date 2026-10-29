@@ -40,6 +40,8 @@ _s3cache/
 *.avi
 *.mkv
 *.webm
+!video-assets/
+!video-assets/**
 
 # --- Build / packaging ---
 *.tgz
