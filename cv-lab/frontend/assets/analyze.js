@@ -558,6 +558,12 @@
     return !!(state.selectedUsecase && state.selectedUsecase.needs_zones);
   }
 
+  // The overlay only accepts clicks while a zone is being drawn. During a run
+  // it must not sit above Stop — a tall frame in a short window used to cover it.
+  function syncOverlayPointer() {
+    $("overlay").classList.toggle("is-drawing", needsZones() && !state.running);
+  }
+
   // ---------- video list ----------
   function renderVideos() {
     var host = $("savedList");
@@ -644,6 +650,7 @@
     state.drawing = [];
     renderUsecases();
     $("zoneBlock").hidden = !u.needs_zones;
+    syncOverlayPointer();
     renderZoneChips();
     renderParams();
     updateConfigPane();
@@ -831,6 +838,7 @@
     ws.onerror = function () { setStatus("WebSocket error.", true); };
 
     state.running = true; state.paused = false;
+    syncOverlayPointer();
     $("overlay").getContext("2d").clearRect(0, 0, $("overlay").width, $("overlay").height);
     $("startBtn").disabled = true;
     $("pauseBtn").disabled = false; $("pauseBtn").textContent = "Pause";
@@ -892,6 +900,7 @@
 
   function endRun(msg) {
     state.running = false; state.paused = false;
+    syncOverlayPointer();
     stopCameraCapture();   // stop pushing camera frames (keep the stream for restart)
     if (state.ws) { try { state.ws.close(); } catch (e) {} state.ws = null; }
     $("pauseBtn").disabled = true; $("stopBtn").disabled = true;
