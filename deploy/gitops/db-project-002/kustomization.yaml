@@ -20,4 +20,4 @@ resources:
 
 images:
   - name: ghcr.io/script-repo/cvlab-retail-supermarket-grocer/cvlab
-    newTag: sha-9f64a593d9c6950747001d797d6c4b793ad08519
+    newTag: sha-56e2d9b2baa9795eb3d39724ec04d6fb5958effd
