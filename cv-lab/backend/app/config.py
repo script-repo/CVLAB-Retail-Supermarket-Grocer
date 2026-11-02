@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     nai_base_url: str = ""                                # e.g. https://your-llm-endpoint/v1
     nai_api_key: str = ""                                # set in .env, never commit
     nai_model: str = "llama3-1-8b"
+    # False skips the endpoint and uses the prepared demo fallback.
+    nai_use_live_llm: bool = True
     nai_verify_ssl: bool = False
     nai_timeout_s: float = 120.0
     # Wall-clock cap for the (large) shift-report generation before it falls

@@ -24,15 +24,25 @@
   }
 
   // ---------- NAI status badge ----------
+  function applyPing(res) {
+    if (!$("naiModel")) return;
+    if (res && res.use_live_llm === false) {
+      $("naiModel").textContent = "demo data";
+      $("naiDot").className = "nai-dot demo";
+      $("naiBadge").title = "Demo data — live inference is off";
+      return;
+    }
+    $("naiModel").textContent = (res && res.model) || "?";
+    $("naiDot").className = "nai-dot " + (res && res.ok ? "ok" : "bad");
+    var where = res && res.base_url ? res.base_url : "not configured";
+    $("naiBadge").title = (res && res.ok ? "Connected: " : "UNREACHABLE: ") + where;
+  }
+
   function pingNai() {
     fetch(API.base + "/api/agent/ping")
       .then(function (r) { return r.json(); })
-      .then(function (res) {
-        $("naiModel").textContent = res.model || "?";
-        $("naiDot").className = "nai-dot " + (res.ok ? "ok" : "bad");
-        $("naiBadge").title = (res.ok ? "Connected: " : "UNREACHABLE: ") + res.base_url;
-      })
-      .catch(function () { $("naiDot").className = "nai-dot bad"; });
+      .then(applyPing)
+      .catch(function () { if ($("naiDot")) $("naiDot").className = "nai-dot bad"; });
   }
 
   // ---------- WebSocket ----------
@@ -120,8 +130,10 @@
       el.className = "feed-item feed-final";
       el.innerHTML = '<span class="step-kind ok">done</span> ' + esc(msg.detail);
     } else if (msg.kind === "error") {
-      el.className = "feed-item feed-final is-error";
-      el.innerHTML = '<span class="step-kind err">fallback</span> ' + esc(msg.label);
+      var demo = /demo data/i.test(msg.label || "");
+      el.className = "feed-item feed-final" + (demo ? "" : " is-error");
+      el.innerHTML = '<span class="step-kind ' + (demo ? "notify" : "err") + '">' +
+        (demo ? "demo" : "fallback") + "</span> " + esc(msg.label);
     } else { return; }
     append(el);
   }
@@ -225,5 +237,10 @@
   }
   function trunc(s, n) { s = String(s || ""); return s.length > n ? s.slice(0, n) + "…" : s; }
 
+  document.addEventListener("cvlab-nai-changed", function (ev) {
+    var res = ev.detail || {};
+    if (res.use_live_llm === false) applyPing(res);
+    else pingNai();
+  });
   document.addEventListener("DOMContentLoaded", init);
 })();

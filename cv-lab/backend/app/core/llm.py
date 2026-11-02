@@ -23,9 +23,9 @@ class NaiError(RuntimeError):
 class NaiClient:
     def __init__(self) -> None:
         s = get_settings()
-        self.base_url = s.nai_base_url.rstrip("/")
+        self.base_url = (s.nai_base_url or "").rstrip("/")
         self.model = s.nai_model
-        self._headers = {"Authorization": f"Bearer {s.nai_api_key}"}
+        self._headers = {"Authorization": f"Bearer {s.nai_api_key}"} if s.nai_api_key else {}
         self._timeout_s = s.nai_timeout_s
         # Short connect timeout so an unreachable/unresolvable endpoint fails fast
         # (otherwise the UI hangs); generous read timeout for slow token decode.
@@ -40,6 +40,7 @@ class NaiClient:
         temperature: float = 0.2,
         max_tokens: int = 700,
         retries: int = 1,
+        timeout: httpx.Timeout | None = None,
     ) -> dict[str, Any]:
         """One chat-completion call. Returns the assistant ``message`` dict
         (may contain ``tool_calls``).
@@ -57,11 +58,17 @@ class NaiClient:
         if tools:
             payload["tools"] = tools
 
+        if not self.base_url:
+            raise NaiError("NAI endpoint is not configured")
+
         last_err: str = ""
         for attempt in range(retries + 1):
             try:
                 resp = await self._client.post(
-                    f"{self.base_url}/chat/completions", json=payload, headers=self._headers
+                    f"{self.base_url}/chat/completions",
+                    json=payload,
+                    headers=self._headers,
+                    timeout=timeout,
                 )
             except httpx.TimeoutException:
                 last_err = f"NAI timeout after {self._timeout_s:.0f}s (attempt {attempt + 1})"
@@ -86,9 +93,18 @@ class NaiClient:
 
     async def ping(self) -> bool:
         """Cheap liveness probe (used by the UI status badge / demo pre-flight)."""
+        if not self.base_url:
+            return False
+        # Keep the settings "Test" button and the status badge from waiting on
+        # the long generation timeout.
+        probe = httpx.Timeout(connect=4.0, read=15.0, write=10.0, pool=4.0)
         try:
             msg = await self.chat(
-                [{"role": "user", "content": "Reply with OK"}], max_tokens=4, temperature=0.0
+                [{"role": "user", "content": "Reply with OK"}],
+                max_tokens=4,
+                temperature=0.0,
+                retries=0,
+                timeout=probe,
             )
             return bool(msg)
         except NaiError as exc:
@@ -105,5 +121,17 @@ _client: NaiClient | None = None
 def get_nai_client() -> NaiClient:
     global _client
     if _client is None:
+        from app.core.nai_config import apply_saved
+
+        apply_saved()
         _client = NaiClient()
     return _client
+
+
+async def reset_nai_client() -> None:
+    """Drop the cached client so the next call picks up saved endpoint settings."""
+    global _client
+    old = _client
+    _client = None
+    if old is not None:
+        await old.close()

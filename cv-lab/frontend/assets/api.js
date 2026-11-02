@@ -35,6 +35,31 @@
       return fetch(API_BASE + "/api/agent/ping", { signal: signal }).then(function (r) { return r.json(); });
     },
 
+    getNaiConfig: function () {
+      return fetch(API_BASE + "/api/agent/nai").then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      });
+    },
+
+    saveNaiConfig: function (body) {
+      return fetch(API_BASE + "/api/agent/nai", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      }).then(function (r) {
+        if (!r.ok) {
+          return r.json().then(function (e) {
+            var detail = e && e.detail;
+            var msg = typeof detail === "string" ? detail
+              : (detail && detail[0] && detail[0].msg) || ("HTTP " + r.status);
+            throw new Error(msg);
+          });
+        }
+        return r.json();
+      });
+    },
+
     // Ops dashboard: NAI 12h summary + recommendation. Optional AbortSignal lets
     // the caller enforce a client-side deadline (falls back to a placeholder).
     opsSummary: function (signal) {

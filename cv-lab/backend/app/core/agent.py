@@ -25,6 +25,7 @@ from app.config import get_settings
 from app.core import persist
 from app.core.events import LIVE_METRICS, Event, get_event_bus, _now_iso
 from app.core.llm import NaiError, get_nai_client
+from app.core.nai_config import prefer_live_llm
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +136,11 @@ class AgentRuntime:
             {"role": "system", "content": self._system_prompt()},
             {"role": "user", "content": self._task_prompt(event, mode)},
         ]
+        if not prefer_live_llm():
+            self._step(run_id, "error", "Demo data", "Live inference is off.")
+            self._fallback(run_id, event, mode)
+            self._emit({"type": "agent_done", "run_id": run_id})
+            return
         client = get_nai_client()
         # Restrict the toolset per mode — small models wander otherwise (e.g.
         # opening a fresh work order during a clearance instead of resolving).
@@ -299,6 +305,8 @@ class AgentRuntime:
             "work_orders": list(self.work_orders.values()),
             "notifications": list(self.notifications),
         }
+        if not prefer_live_llm():
+            return self._local_report(payload, demo=True)
         prompt = (
             "Write a concise end-of-shift operations briefing for the store manager based on "
             "this JSON log of computer-vision incidents, agent-created work orders, and "
@@ -329,7 +337,7 @@ class AgentRuntime:
             logger.warning("shift report falling back to local generation: %s", exc)
             return self._local_report(payload, str(exc))
 
-    def _local_report(self, payload: dict[str, Any], nai_error: str = "") -> str:
+    def _local_report(self, payload: dict[str, Any], nai_error: str = "", *, demo: bool = False) -> str:
         """Deterministic, no-LLM shift report from the event log (NAI fallback)."""
         events = payload["events"]
         wos = payload["work_orders"]
@@ -340,7 +348,10 @@ class AgentRuntime:
         resolved = [w for w in wos if w.get("status") == "resolved"]
 
         out: list[str] = [f"# Shift Report — {payload['store']}", ""]
-        note = "NAI endpoint unavailable" + (f" ({nai_error})" if nai_error else "")
+        if demo:
+            note = "Demo data — live inference is off"
+        else:
+            note = "NAI endpoint unavailable" + (f" ({nai_error})" if nai_error else "")
         out.append(f"> _{note}. This briefing was generated locally from the event log (no LLM)._")
         out += [
             "", "## Summary",
@@ -496,6 +507,9 @@ class AgentRuntime:
     async def ops_summary(self, hours: int = 12) -> dict[str, Any]:
         payload = self._recent(hours)
         counts = self._counts(payload)
+        if not prefer_live_llm():
+            summary, recommendation = self._local_summary(counts)
+            return {"summary": summary, "recommendation": recommendation, "nai": False, "demo": True}
         prompt = (
             f"You are the operations analyst for {payload['store']}. Based on this JSON log of the "
             f"last {hours} hours of computer-vision incidents, agent work orders, and notifications, "
@@ -525,10 +539,15 @@ class AgentRuntime:
         summary, recommendation = self._local_summary(counts)
         return {"summary": summary, "recommendation": recommendation, "nai": False}
 
-    def _local_answer(self, question: str, payload: dict[str, Any]) -> str:
+    def _local_answer(self, question: str, payload: dict[str, Any], *, demo: bool = False) -> str:
         c = self._counts(payload)
+        lead = (
+            "Demo data — live inference is off. Snapshot from the event log:"
+            if demo else
+            "NAI is currently unreachable — here is a data-only snapshot:"
+        )
         lines = [
-            "NAI is currently unreachable — here is a data-only snapshot:",
+            lead,
             "",
             f"- **Incidents (12h):** {len(c['detected'])} detected",
             f"- **Work orders:** {len(c['wos'])} total ({len(c['open'])} open, {len(c['resolved'])} resolved)",
@@ -543,6 +562,8 @@ class AgentRuntime:
 
     async def answer_question(self, question: str) -> dict[str, Any]:
         payload = self._recent(12)
+        if not prefer_live_llm():
+            return {"answer": self._local_answer(question, payload, demo=True), "nai": False, "demo": True}
         system = (
             f"You are the store-operations assistant for {payload['store']}. Answer the manager's "
             "question using ONLY the provided JSON context (recent CV incidents, work orders, "
@@ -573,7 +594,11 @@ class AgentRuntime:
             "work_orders": list(self.work_orders.values()),
             "notifications": list(self.notifications),
             "steps": list(self.steps),
-            "nai": {"base_url": self.settings.nai_base_url, "model": self.settings.nai_model},
+            "nai": {
+                "base_url": self.settings.nai_base_url,
+                "model": self.settings.nai_model,
+                "use_live_llm": prefer_live_llm(),
+            },
         }
 
 

@@ -240,7 +240,9 @@
 
   // Client-side deadline: if NAI hasn't answered within this window, show a
   // prepared placeholder instead of blocking the demo on a slow endpoint.
-  var NAI_DEADLINE_MS = 4000;
+  var LIVE_DEADLINE_MS = 35000;
+  var liveLlm = true;
+  var opsLoadGen = 0;
 
   // Minimal markdown renderer (headers, bold/italic, bulleted lists, paragraphs).
   function mdToHtml(md) {
@@ -311,15 +313,24 @@
     "- No safety hazards are currently open\n\n" +
     "Ask again in a moment for a live, data-grounded answer.";
 
-  function setBadge(ok) {
+  function setBadge(ok, demo) {
     var dot = document.getElementById("opsNaiDot");
-    if (dot) dot.className = "nai-dot " + (ok ? "ok" : "bad");
+    var label = document.getElementById("opsNaiLabel");
+    var badge = document.getElementById("opsNaiBadge");
+    if (dot) dot.className = "nai-dot " + (demo ? "demo" : ok ? "ok" : "bad");
+    if (label) label.textContent = demo ? "Demo" : "NAI";
+    if (badge) {
+      badge.title = demo
+        ? "Demo data — live inference is off"
+        : (ok ? "Connected to NAI" : "NAI endpoint unreachable");
+    }
   }
 
   // The badge reflects whether NAI is reachable, via a dedicated liveness probe.
   // (Tying it to the 12h-summary call made it perpetually red, because that
   // large generation usually exceeds the client-side display deadline.)
   function refreshNaiBadge() {
+    if (!liveLlm) { setBadge(false, true); return; }
     if (!window.API || !API.pingNai) return;
     var done = false;
     var ctrl = new AbortController();
@@ -327,7 +338,9 @@
       if (done) return; done = true; ctrl.abort(); setBadge(false);
     }, 8000);
     API.pingNai(ctrl.signal).then(function (res) {
-      if (done) return; done = true; clearTimeout(t); setBadge(!!(res && res.ok));
+      if (done) return; done = true; clearTimeout(t);
+      if (res && res.use_live_llm === false) { liveLlm = false; setBadge(false, true); return; }
+      setBadge(!!(res && res.ok));
     }).catch(function () {
       if (done) return; done = true; clearTimeout(t); setBadge(false);
     });
@@ -351,6 +364,11 @@
   function loadSummary() {
     var sum = document.getElementById("opsSummary");
     if (!sum || !window.API || !API.opsSummary) return;
+    if (!liveLlm) {
+      renderSummary(PLACEHOLDER_SUMMARY.summary, PLACEHOLDER_SUMMARY.recommendation, false);
+      setBadge(false, true);
+      return;
+    }
     sum.innerHTML = '<p class="muted small"><span class="spinner"></span> NAI is summarizing the last 12 hours&hellip;</p>';
     document.getElementById("opsReco").hidden = true;
 
@@ -358,15 +376,15 @@
     var ctrl = new AbortController();
     var timer = setTimeout(function () {
       if (settled) return; settled = true; ctrl.abort();
-      renderSummary(PLACEHOLDER_SUMMARY.summary, PLACEHOLDER_SUMMARY.recommendation, false);
-    }, NAI_DEADLINE_MS);
+      sum.innerHTML = '<p class="muted small">The live summary is taking longer than expected. Check the NAI endpoint in Settings, or switch to demo data.</p>';
+    }, LIVE_DEADLINE_MS);
 
     API.opsSummary(ctrl.signal).then(function (res) {
       if (settled) return; settled = true; clearTimeout(timer);
       renderSummary(res.summary, res.recommendation, res.nai);
     }).catch(function () {
       if (settled) return; settled = true; clearTimeout(timer);
-      renderSummary(PLACEHOLDER_SUMMARY.summary, PLACEHOLDER_SUMMARY.recommendation, false);
+      sum.innerHTML = '<p class="muted small">Couldn\'t reach the NAI endpoint. Check Settings, or switch to demo data.</p>';
     });
   }
 
@@ -395,29 +413,45 @@
     if (!q || !window.API || !API.opsAsk) return;
     addBubble("user", q);
     document.getElementById("chatInput").value = "";
+    if (!liveLlm) {
+      var demo = placeholderMd || CANNED[q] || GENERIC_CHAT_PLACEHOLDER;
+      finishBubble(addBubble("bot", "", true), demo, false);
+      setBadge(false, true);
+      return;
+    }
     var pending = addBubble("bot", "", true);
-    var fallback = placeholderMd || GENERIC_CHAT_PLACEHOLDER;
 
     var settled = false;
     var ctrl = new AbortController();
     var timer = setTimeout(function () {
       if (settled) return; settled = true; ctrl.abort();
-      finishBubble(pending, fallback, false);
-    }, NAI_DEADLINE_MS);
+      finishBubble(pending, "The live answer is taking longer than expected. Check the NAI endpoint in Settings, or switch to demo data.", false);
+    }, LIVE_DEADLINE_MS);
 
     API.opsAsk(q, ctrl.signal).then(function (res) {
       if (settled) return; settled = true; clearTimeout(timer);
       finishBubble(pending, res.answer || "(no answer)", res.nai);
     }).catch(function () {
       if (settled) return; settled = true; clearTimeout(timer);
-      finishBubble(pending, fallback, false);
+      finishBubble(pending, "Couldn't reach the NAI endpoint. Check Settings, or switch to demo data.", false);
     });
   }
 
   function setupOps() {
     if (!document.getElementById("opsDash")) return;
-    refreshNaiBadge();
-    loadSummary();
+    var ticket = ++opsLoadGen;
+    var start = function () {
+      if (ticket !== opsLoadGen) return;
+      refreshNaiBadge();
+      loadSummary();
+    };
+    if (window.API && API.getNaiConfig) {
+      API.getNaiConfig().then(function (cfg) {
+        if (ticket !== opsLoadGen) return;
+        liveLlm = !cfg || cfg.use_live_llm !== false;
+        start();
+      }).catch(start);
+    } else start();
     document.getElementById("opsRefresh").addEventListener("click", function () {
       refreshNaiBadge(); loadSummary();
     });
@@ -442,6 +476,14 @@
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeModal(); });
     document.addEventListener("cvlab-settings-changed", function () {
       renderFilters(); renderCards();
+    });
+    document.addEventListener("cvlab-nai-changed", function (ev) {
+      var res = ev.detail || {};
+      if (typeof res.use_live_llm === "boolean") liveLlm = res.use_live_llm;
+      opsLoadGen++;
+      if (!document.getElementById("opsDash")) return;
+      refreshNaiBadge();
+      loadSummary();
     });
     window.addEventListener("beforeunload", mvTeardown);
   }

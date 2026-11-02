@@ -17,7 +17,8 @@ from pydantic import BaseModel
 
 from app.core.agent import get_agent_runtime
 from app.core.events import get_event_bus
-from app.core.llm import NaiError, get_nai_client
+from app.core.llm import NaiError, get_nai_client, reset_nai_client
+from app.core.nai_config import prefer_live_llm, public_config, save_config
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -27,17 +28,55 @@ class ChatRequest(BaseModel):
     question: str
 
 
+class NaiConfigUpdate(BaseModel):
+    base_url: str | None = None
+    model: str | None = None
+    api_key: str | None = None
+    clear_api_key: bool = False
+    use_live_llm: bool | None = None
+
+
 @router.get("/api/agent/state")
 def agent_state() -> dict:
     return get_agent_runtime().state()
 
 
+@router.get("/api/agent/nai")
+def agent_nai_config() -> dict:
+    """Current NAI endpoint (API key is masked)."""
+    return public_config()
+
+
+@router.put("/api/agent/nai")
+async def agent_nai_config_update(body: NaiConfigUpdate) -> dict:
+    """Save the NAI base URL, model, and API key from the settings panel."""
+    try:
+        saved = save_config(
+            base_url=body.base_url,
+            model=body.model,
+            api_key=body.api_key,
+            clear_api_key=body.clear_api_key,
+            use_live_llm=body.use_live_llm,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    await reset_nai_client()
+    return saved
+
+
 @router.get("/api/agent/ping")
 async def agent_ping() -> dict:
     """Demo pre-flight: verifies the NAI endpoint answers."""
-    ok = await get_nai_client().ping()
     s = get_agent_runtime().settings
-    return {"ok": ok, "model": s.nai_model, "base_url": s.nai_base_url}
+    live = prefer_live_llm()
+    ok = await get_nai_client().ping() if live else False
+    return {
+        "ok": ok,
+        "model": s.nai_model,
+        "base_url": s.nai_base_url,
+        "configured": bool((s.nai_base_url or "").strip()),
+        "use_live_llm": live,
+    }
 
 
 @router.get("/api/events/{event_id}/snapshot")

@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api import agent, analyze, gpu, streams, videos
 from app.config import get_settings
 from app.core.agent import get_agent_runtime
+from app.core.nai_config import apply_saved
 from app.usecases import list_usecases
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -40,6 +41,8 @@ app.include_router(streams.router)
 
 @app.on_event("startup")
 async def _start_agent() -> None:
+    # UI-saved NAI endpoint overrides env defaults before the agent starts.
+    apply_saved()
     # Instantiate the agent runtime so its event-bus listener is registered
     # before the first analysis stream starts.
     get_agent_runtime()
