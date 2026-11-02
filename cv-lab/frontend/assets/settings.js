@@ -83,7 +83,23 @@
       '    <button class="btn ghost" id="settingsClose">Close</button></div>' +
       '  <div class="settings-body">' +
       '    <section class="settings-sec">' +
-      '      <h3>NAI inference</h3>' +
+      '      <h3>Display</h3>' +
+      '      <label class="toggle-row"><input type="checkbox" id="setAdvGpu"/>' +
+      '        <span><b>Advanced GPU stats</b><br/><small>Stacked per-use-case utilization bar (hover a segment for the use-case name and share).</small></span></label>' +
+      '      <label class="toggle-row"><input type="checkbox" id="setMultiView"/>' +
+      '        <span><b>Multi-view (CCTV wall)</b><br/><small>Library cards become simultaneous live analyzer tiles. Frame rate adapts to the number of active tiles.</small></span></label>' +
+      '    </section>' +
+      '    <section class="settings-sec">' +
+      '      <h3>Use-case visibility</h3>' +
+      '      <p class="muted small">Unchecked use cases are hidden from the analysis sidebar, the library grid, and multi-view.</p>' +
+      '      <div class="uc-vis-actions">' +
+      '        <button class="link-btn" id="visAll">Show all</button>' +
+      '        <button class="link-btn" id="visNone">Hide all</button>' +
+      '      </div>' +
+      '      <div class="uc-vis-grid" id="ucVisGrid"><p class="muted small">Loading…</p></div>' +
+      '    </section>' +
+      '    <section class="settings-sec">' +
+      '      <h3>Inference</h3>' +
       '      <div class="source-toggle" id="naiModeToggle">' +
       '        <button type="button" class="src-btn is-active" data-mode="live">Live inference</button>' +
       '        <button type="button" class="src-btn" data-mode="demo">Demo data</button>' +
@@ -102,22 +118,6 @@
       '        <button class="link-btn" type="button" id="naiClearKey">Clear saved key</button>' +
       '      </div>' +
       '      <p class="nai-status muted small" id="naiStatus"></p>' +
-      '    </section>' +
-      '    <section class="settings-sec">' +
-      '      <h3>Display</h3>' +
-      '      <label class="toggle-row"><input type="checkbox" id="setAdvGpu"/>' +
-      '        <span><b>Advanced GPU stats</b><br/><small>Stacked per-use-case utilization bar (hover a segment for the use-case name and share).</small></span></label>' +
-      '      <label class="toggle-row"><input type="checkbox" id="setMultiView"/>' +
-      '        <span><b>Multi-view (CCTV wall)</b><br/><small>Library cards become simultaneous live analyzer tiles. Frame rate adapts to the number of active tiles.</small></span></label>' +
-      '    </section>' +
-      '    <section class="settings-sec">' +
-      '      <h3>Use-case visibility</h3>' +
-      '      <p class="muted small">Unchecked use cases are hidden from the analysis sidebar, the library grid, and multi-view.</p>' +
-      '      <div class="uc-vis-actions">' +
-      '        <button class="link-btn" id="visAll">Show all</button>' +
-      '        <button class="link-btn" id="visNone">Hide all</button>' +
-      '      </div>' +
-      '      <div class="uc-vis-grid" id="ucVisGrid"><p class="muted small">Loading…</p></div>' +
       '    </section>' +
       '  </div>' +
       '</div>';
