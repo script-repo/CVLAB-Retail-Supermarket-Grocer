@@ -445,6 +445,52 @@ def get_prompted_model(prompts: list[str] | tuple[str, ...]):
         return None
 
 
+_visual_cache: dict[str, "InferenceModel"] = {}
+_VISUAL_CACHE_MAX = 4
+
+
+def get_visual_prompt_model(refer_frame: np.ndarray, boxes: list[list[float]], names: list[str]):
+    """Open-vocabulary detector for products shown by example, or None.
+
+    ``boxes`` (xyxy pixels in ``refer_frame``) each outline one example; class
+    ``i`` = ``names[i]`` (repeat a name to give several examples of one
+    product). The visual-prompt embeddings are computed once (~2 s on CPU);
+    after that it runs as a normal YOLOE detector. Kept in PyTorch (FP16 on
+    GPU): every new set of examples would otherwise need its own export.
+    """
+    name = get_settings().open_vocab_model
+    if not name or not boxes:
+        return None
+    labels = list(dict.fromkeys(names))  # unique, in order
+    cls = np.array([labels.index(n) for n in names])
+    h = hashlib.sha1(refer_frame.tobytes())
+    h.update(np.asarray(boxes, np.float32).tobytes())
+    h.update("\n".join(names).encode())
+    key = h.hexdigest()
+    with _lock:
+        if key in _visual_cache:
+            return _visual_cache[key]
+        try:
+            from ultralytics import YOLOE
+
+            plan = plan_runtime()
+            yoloe = YOLOE(name)
+            yoloe.predict(refer_frame, refer_image=refer_frame, verbose=False, device=plan.device,
+                          visual_prompts={"bboxes": np.asarray(boxes, np.float32), "cls": cls})
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Visual-prompt model unavailable: %s", exc)
+            return None
+        kwargs = {"device": plan.device, "imgsz": get_settings().model_imgsz}
+        if plan.half:
+            kwargs["quantize"] = 16
+        model = InferenceModel(yoloe, "pytorch", plan.device, plan.half, name, kwargs, tuple(labels))
+        while len(_visual_cache) >= _VISUAL_CACHE_MAX:
+            _visual_cache.pop(next(iter(_visual_cache)))
+        _visual_cache[key] = model
+        logger.info("Visual-prompt model ready: %s (%d examples)", ", ".join(labels), len(boxes))
+        return model
+
+
 def get_pose_model():
     """Keypoint model (``POSE_MODEL``), or None when blank / unavailable."""
     name = get_settings().pose_model

@@ -97,6 +97,15 @@ check (≥50% inside the changed area, ≤25% of the floor).
 ### UC-17 — Visual Product Search for Shoppers · `product-recognition`
 Demonstrates "find similar products" visual search from a frame.
 
+**Search by example:** draw a zone around one example of each product on the
+first frame and rename the zone to the product's name (zone names are
+editable). YOLOE uses the examples as visual prompts and highlights every match
+in later frames. On the bundled shelf video, one example each found the salsa
+jars and the four teal tortilla-chip bags, and skipped the black bags. Setup
+takes about 5 s once, then about 70 ms/frame on CPU. Without zones it falls
+back to naming the largest COCO object. Text prompts ("salsa jar") did not work
+for this; examples do.
+
 ### UC-18 — Supply Chain & Receiving Dock Verification · `product-recognition`
 Verifies pallets/cases at the receiving dock against expectations.
 

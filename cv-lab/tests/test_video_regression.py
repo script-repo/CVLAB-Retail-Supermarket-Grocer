@@ -104,3 +104,28 @@ def test_uc07_counts_visitors():
     v = run("uc-07", TRAFFIC)[-1][1]["values"]
     assert 8 <= v["live_count"] <= 25
     assert v["unique_visitors"] >= v["live_count"]
+
+
+def _rect(x1, y1, x2, y2, w=1280, h=720):
+    return [[x1 / w, y1 / h], [x2 / w, y1 / h], [x2 / w, y2 / h], [x1 / w, y2 / h]]
+
+
+def test_uc17_search_by_example_finds_the_drawn_products():
+    import app.usecases as U
+    from app.schemas import AnalysisConfig
+
+    cap = cv2.VideoCapture(str(VIDEOS / SHELF))
+    ok, first_frame = cap.read()
+    assert ok
+    zones = [{"name": "salsa jar", "points": _rect(333, 20, 387, 113)},
+             {"name": "tortilla chips", "points": _rect(267, 527, 373, 687)}]
+    an = U.get_analyzer_cls("uc-17")(fps=FPS)
+    an.setup(first_frame, AnalysisConfig(video_id="t", usecase="uc-17", zones=zones))
+    if an.vp is None:
+        pytest.skip("open-vocabulary model unavailable")
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 216)   # ~9 s in, shelf unobstructed
+    _, m = an.process_frame(cap.read()[1], 9.0)
+    v = m["values"]
+    assert v["mode"] == "examples"
+    assert v["matches"]["salsa jar"] >= 5
+    assert 3 <= v["matches"]["tortilla chips"] <= 6     # teal bags only, not the black ones

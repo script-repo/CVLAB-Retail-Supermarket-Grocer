@@ -757,8 +757,21 @@
     var host = $("zoneChips");
     host.innerHTML = "";
     state.zones.forEach(function (z, i) {
+      // Editable label: zone names show on the overlay and, for UC-17, name
+      // the product the zone outlines.
       var li = document.createElement("li");
-      li.textContent = z.name + " (" + z.points.length + ")";
+      var input = document.createElement("input");
+      input.type = "text";
+      input.value = z.name;
+      input.maxLength = 40;
+      input.setAttribute("aria-label", "Zone " + (i + 1) + " name");
+      input.addEventListener("change", function () {
+        z.name = input.value.trim() || ("Zone " + (i + 1));
+        input.value = z.name;
+        saveZonesForCurrent();
+        drawZoneOverlay();
+      });
+      li.appendChild(input);
       host.appendChild(li);
     });
   }

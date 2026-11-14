@@ -378,6 +378,7 @@ const USE_CASES = [
       "Litmus Unify (MQTT) — kiosk request/response"
     ],
     models: [
+      { name: "YOLOE-26 (visual prompts)", role: "Search by example", why: "Draw a box around one example of a product and name it; YOLOE finds every matching product — specific SKUs rather than generic COCO classes — with no training." },
       { name: "YOLO11 (COCO)", role: "Identify the held / prominent product", why: "Detects the largest object presented to the camera as the search subject." },
       { name: "Grounding DINO (optional, open-vocab)", role: "Arbitrary-SKU / text-prompted match", why: "Open-vocabulary detection or an embedding index handles SKUs beyond the COCO classes." },
       { name: "Catalog → aisle map", role: "Locate the matched product", why: "Maps the recognized product to its aisle/bay for shopper directions." }
