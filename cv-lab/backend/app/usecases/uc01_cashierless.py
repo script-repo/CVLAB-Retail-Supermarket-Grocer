@@ -17,7 +17,7 @@ from app.core.tracking import Tracker
 from app.schemas import AnalysisConfig
 
 from .base import BRAND_CYAN, BRAND_FRESH, BRAND_GREEN, UseCaseAnalyzer, draw_banner, draw_chip, register
-from .common import GROCERY_CLASSES, PERSON, detect
+from .common import detect_groups, GROCERY_CLASSES, PERSON
 
 
 @register
@@ -47,9 +47,10 @@ class CashierlessAnalyzer(UseCaseAnalyzer):
 
     def process_frame(self, frame: np.ndarray, timestamp_s: float) -> tuple[np.ndarray, dict[str, Any]]:
         self.frame_index += 1
-        people = detect(self.model, frame, classes=[PERSON])
-        people = self.tracker.update(people, timestamp_s)
-        items = detect(self.model, frame, classes=self.item_classes, conf=0.4)
+        found = detect_groups(self.model, frame, {
+            "people": ([PERSON], 0.35), "items": (self.item_classes, 0.4)})
+        people = self.tracker.update(found["people"], timestamp_s)
+        items = found["items"]
         self.basket = len(items)
 
         self.line.trigger(people)

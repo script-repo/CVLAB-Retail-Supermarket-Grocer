@@ -40,6 +40,28 @@ def detect(model, frame: np.ndarray, classes: list[int] | None = None, conf: flo
     return detections_from_yolo(result)
 
 
+def detect_groups(model, frame: np.ndarray,
+                  groups: dict[str, tuple[list[int], float]]) -> dict[str, sv.Detections]:
+    """One inference pass for several class groups, split afterwards.
+
+    ``groups`` maps a name to ``(class_ids, conf)``. The model runs once with
+    the union of classes at the lowest threshold, then each group keeps only
+    its classes at its own threshold. Equivalent to one ``detect()`` call per
+    group (NMS is per class), at the cost of a single forward pass.
+    """
+    all_classes = sorted({c for classes, _ in groups.values() for c in classes})
+    min_conf = min(conf for _, conf in groups.values())
+    det = detect(model, frame, classes=all_classes, conf=min_conf)
+    out: dict[str, sv.Detections] = {}
+    for name, (classes, conf) in groups.items():
+        if len(det) == 0:
+            out[name] = det
+            continue
+        keep = np.isin(det.class_id, classes) & (det.confidence >= conf)
+        out[name] = det[keep]
+    return out
+
+
 def draw_detections(frame: np.ndarray, det: sv.Detections, color, *, label: str | None = None,
                     thickness: int = 2) -> None:
     """Draw detection boxes with class-name chips (shared GPU-pass overlay)."""

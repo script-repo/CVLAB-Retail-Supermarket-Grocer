@@ -17,7 +17,7 @@ from app.core.tracking import Tracker
 from app.schemas import AnalysisConfig
 
 from .base import BRAND_GREEN, BRAND_RED, UseCaseAnalyzer, draw_banner, draw_chip, register
-from .common import BAG_CLASSES, PERSON, detect
+from .common import BAG_CLASSES, detect_groups, PERSON
 
 
 def _center(b):
@@ -43,9 +43,10 @@ class TheftAnalyzer(UseCaseAnalyzer):
 
     def process_frame(self, frame: np.ndarray, timestamp_s: float) -> tuple[np.ndarray, dict[str, Any]]:
         self.frame_index += 1
-        people = detect(self.model, frame, classes=[PERSON])
-        people = self.tracker.update(people, timestamp_s)
-        bags = detect(self.model, frame, classes=list(BAG_CLASSES.keys()), conf=0.3)
+        found = detect_groups(self.model, frame, {
+            "people": ([PERSON], 0.35), "bags": (list(BAG_CLASSES.keys()), 0.3)})
+        people = self.tracker.update(found["people"], timestamp_s)
+        bags = found["bags"]
         bag_centers = [_center(b) for b in bags.xyxy]
 
         reviews_now = 0
