@@ -136,18 +136,26 @@ def plan_runtime() -> RuntimePlan:
     return RuntimePlan(dev, "pytorch", False, f"device {dev}")
 
 
-def _cpu_has_bf16() -> bool:
+def _fp32_runs_as_bf16() -> bool:
+    """True if OpenVINO already runs FP32 models in BF16 on this CPU (its
+    default inference precision is bf16, i.e. Intel AMX), so INT8 can't help.
+
+    Uses OpenVINO's own default rather than the BF16 capability flag: CPUs with
+    AVX-512 BF16 but no AMX (AMD Zen 4/5, Intel Cooper Lake) report BF16 support
+    yet still default to f32, and INT8 does speed them up."""
     try:
         import openvino as ov
 
-        return "BF16" in ov.Core().get_property("CPU", "OPTIMIZATION_CAPABILITIES")
+        hint = str(ov.Core().get_property("CPU", "INFERENCE_PRECISION_HINT")).lower()
+        return "bf16" in hint or "bfloat16" in hint
     except Exception:  # noqa: BLE001
         return False
 
 
 def _cpu_has_vnni() -> bool | None:
-    """True/False from the CPU flags (VNNI = hardware INT8 dot products), or
-    None when the flags can't be read (non-Linux)."""
+    """True/False from the CPU flags (VNNI = hardware INT8 dot products; Intel
+    since Cascade Lake / Ice Lake / Alder Lake, AMD since Zen 4), or None when
+    the flags can't be read (non-Linux)."""
     try:
         flags = Path("/proc/cpuinfo").read_text()
     except OSError:
@@ -164,8 +172,8 @@ def _want_int8() -> tuple[bool, str]:
             logger.warning("MODEL_INT8=%s but nncf is not installed; using FP32", mode)
         return False, ""
     if mode == "auto":
-        if _cpu_has_bf16():
-            return False, " (BF16-capable CPU: FP32 models already run in BF16; INT8 skipped)"
+        if _fp32_runs_as_bf16():
+            return False, " (AMX CPU: FP32 models already run in BF16; INT8 skipped)"
         if not _cpu_has_vnni():
             # Without VNNI, INT8 gains are small or negative: stay on FP32.
             return False, " (CPU without VNNI: INT8 skipped)"

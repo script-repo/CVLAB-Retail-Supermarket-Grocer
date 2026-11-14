@@ -110,7 +110,7 @@ def _int8(monkeypatch, mode="auto", nncf=True, bf16=False, vnni=True):
     monkeypatch.setenv("MODEL_INT8", mode)
     get_settings.cache_clear()
     monkeypatch.setattr(M, "_has_module", lambda name: nncf if name == "nncf" else True)
-    monkeypatch.setattr(M, "_cpu_has_bf16", lambda: bf16)
+    monkeypatch.setattr(M, "_fp32_runs_as_bf16", lambda: bf16)
     monkeypatch.setattr(M, "_cpu_has_vnni", lambda: vnni)
     return M._want_int8()[0]
 
@@ -118,6 +118,8 @@ def _int8(monkeypatch, mode="auto", nncf=True, bf16=False, vnni=True):
 def test_int8_auto_only_with_vnni_and_without_amx(monkeypatch):
     assert _int8(monkeypatch) is True                      # VNNI, no AMX: faster
     assert _int8(monkeypatch, bf16=True) is False          # AMX: FP32 already runs as BF16
+    # AMD Zen 4/5: VNNI + AVX-512 BF16 but OpenVINO defaults to f32 -> INT8 on
+    assert _int8(monkeypatch, bf16=False, vnni=True) is True
     assert _int8(monkeypatch, vnni=False) is False         # no VNNI: little/no gain
     assert _int8(monkeypatch, vnni=None) is False          # unknown CPU: stay safe
     assert _int8(monkeypatch, nncf=False) is False         # extra not installed

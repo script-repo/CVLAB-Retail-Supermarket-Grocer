@@ -23,7 +23,7 @@ For local development, copy [`../.env.example`](../.env.example) to
 | `MODEL_FORMAT` | `auto` | Inference runtime. `auto` picks the fastest one for the hardware (below). Force with `pytorch`, `tensorrt`, `openvino` or `onnx`. |
 | `MODEL_FP16` | _(blank)_ | Blank = FP16 on GPU, FP32 on CPU. `false` forces FP32 on GPU. FP16 is never used on CPU. |
 | `MODEL_IMGSZ` | `640` | Model input size (also the size exported models are built for). |
-| `MODEL_INT8` | `auto` | INT8 OpenVINO detector on CPU. `auto` = only on CPUs with VNNI but without BF16/AMX, when `nncf` is installed (`requirements-int8.txt`). `true` forces it, `false` disables. Pose/YOLOE models stay FP32. |
+| `MODEL_INT8` | `auto` | INT8 OpenVINO detector on CPU. `auto` = only on CPUs with VNNI where OpenVINO doesn't already run FP32 as BF16 (i.e. no AMX; AMD Zen 4/5 qualify), when `nncf` is installed (`requirements-int8.txt`). `true` forces it, `false` disables. Pose/YOLOE models stay FP32. |
 | `CALIB_DIR` | _(blank)_ | Images for INT8 calibration. Blank = sample `CALIB_FRAMES` (300) frames from stored/bundled videos. |
 | `EXPORT_DIR` | `<MODELS_DIR>/exported` | Cache for exported models. Put it on a persistent volume so exports survive restarts. |
 | `MODEL_WARMUP` | `true` | Load (and, on first run, export) the COCO model in the background at startup. |
