@@ -21,7 +21,8 @@
     "uc-16": [
       { key: "diff_thresh", label: "Change sensitivity", min: 10, max: 90, step: 5, def: 35 },
       { key: "min_area_frac", label: "Min spill area (% of floor)", min: 0.002, max: 0.08, step: 0.002, def: 0.01, pct: true },
-      { key: "persist_frames", label: "Persistence (frames)", min: 2, max: 40, step: 1, def: 12 }
+      { key: "persist_frames", label: "Persistence (frames)", min: 2, max: 40, step: 1, def: 12 },
+      { key: "sign_conf", label: "Wet-floor sign confidence", min: 0.05, max: 0.8, step: 0.05, def: 0.25 }
     ]
   };
 
@@ -215,6 +216,16 @@
     bar.className = "meter-fill" + (p >= 85 ? " hot" : p >= 50 ? " warm" : "");
   }
 
+  // "OpenVINO · FP32" etc. — what the loaded model actually runs on (else the plan).
+  function runtimeLabel(d) {
+    var labels = { tensorrt: "TensorRT", openvino: "OpenVINO", onnx: "ONNX Runtime", pytorch: "PyTorch", exported: "Exported model" };
+    var m = d && d.models && d.models[0];
+    var r = m ? m.runtime : (d && d.runtime ? d.runtime.runtime : null);
+    if (!r) return "";
+    var prec = m ? m.precision : (d.runtime.half ? "fp16" : "fp32");
+    return "  ·  " + (labels[r] || r) + " " + String(prec).toUpperCase() + (m ? "" : " (loading)");
+  }
+
   function renderGpu(d) {
     var badge = $("gpuBadge");
     var name = $("gpuName");
@@ -222,7 +233,7 @@
     if (!d || !d.available) {
       badge.textContent = "CPU";
       badge.className = "gpu-badge cpu";
-      name.textContent = d && d.device ? "Running on " + d.device + " (no GPU detected)" : "No GPU detected — CPU mode";
+      name.textContent = (d && d.device ? "Running on " + d.device + " (no GPU detected)" : "No GPU detected — CPU mode") + runtimeLabel(d);
       $("gpuUtilVal").textContent = "—"; setBar("gpuUtilBar", 0);
       $("gpuMemVal").textContent = "—"; setBar("gpuMemBar", 0);
       stats.innerHTML = "";
@@ -231,7 +242,7 @@
     var g = d.gpu || {};
     badge.textContent = d.in_use ? "Active" : "Idle";
     badge.className = "gpu-badge " + (d.in_use ? "active" : "idle");
-    name.textContent = (g.name || "GPU") + "  ·  " + (d.device || "");
+    name.textContent = (g.name || "GPU") + "  ·  " + (d.device || "") + runtimeLabel(d);
 
     var util = g.util_pct != null ? g.util_pct : 0;
     $("gpuUtilVal").textContent = g.util_pct != null ? Math.round(g.util_pct) + "%" : "—";
@@ -746,8 +757,21 @@
     var host = $("zoneChips");
     host.innerHTML = "";
     state.zones.forEach(function (z, i) {
+      // Editable label: zone names show on the overlay and, for UC-17, name
+      // the product the zone outlines.
       var li = document.createElement("li");
-      li.textContent = z.name + " (" + z.points.length + ")";
+      var input = document.createElement("input");
+      input.type = "text";
+      input.value = z.name;
+      input.maxLength = 40;
+      input.setAttribute("aria-label", "Zone " + (i + 1) + " name");
+      input.addEventListener("change", function () {
+        z.name = input.value.trim() || ("Zone " + (i + 1));
+        input.value = z.name;
+        saveZonesForCurrent();
+        drawZoneOverlay();
+      });
+      li.appendChild(input);
       host.appendChild(li);
     });
   }

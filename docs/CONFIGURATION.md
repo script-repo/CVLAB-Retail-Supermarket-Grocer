@@ -20,18 +20,89 @@ For local development, copy [`../.env.example`](../.env.example) to
 | Variable | Default | Description |
 |---|---|---|
 | `DEVICE` | `auto` | `auto` picks CUDA if available, else CPU. Force with `cpu` or `cuda:0`. |
+| `MODEL_FORMAT` | `auto` | Inference runtime. `auto` picks the fastest one for the hardware (below). Force with `pytorch`, `tensorrt`, `openvino` or `onnx`. |
+| `MODEL_FP16` | _(blank)_ | Blank = FP16 on GPU, FP32 on CPU. `false` forces FP32 on GPU. FP16 is never used on CPU. |
+| `MODEL_IMGSZ` | `640` | Model input size (also the size exported models are built for). |
+| `MODEL_INT8` | `auto` | INT8 OpenVINO detector on CPU. `auto` = only on CPUs with VNNI where OpenVINO doesn't already run FP32 as BF16 (i.e. no AMX; AMD Zen 4/5 qualify), when `nncf` is installed (`requirements-int8.txt`). `true` forces it, `false` disables. Pose/YOLOE models stay FP32. |
+| `CALIB_DIR` | _(blank)_ | Images for INT8 calibration. Blank = sample `CALIB_FRAMES` (300) frames from stored/bundled videos. |
+| `EXPORT_DIR` | `<MODELS_DIR>/exported` | Cache for exported models. Put it on a persistent volume so exports survive restarts. |
+| `MODEL_WARMUP` | `true` | Load (and, on first run, export) the COCO model in the background at startup. |
+
+### How `MODEL_FORMAT=auto` chooses
+
+| Hardware | Package present | Runtime used |
+|---|---|---|
+| NVIDIA GPU | `tensorrt` (`requirements-gpu.txt`) | **TensorRT engine, FP16** |
+| NVIDIA GPU | — | PyTorch on CUDA, FP16 |
+| CPU only | `openvino` (in `requirements.txt`) | **OpenVINO IR, FP32** |
+| CPU only | `onnxruntime` + `onnx` | ONNX Runtime |
+| CPU only | — | PyTorch |
+
+- The export runs once from the `.pt` weights and is cached in `EXPORT_DIR`.
+  OpenVINO takes seconds; a TensorRT engine takes a few minutes on first start.
+- TensorRT engines only run on the GPU model and TensorRT version that built
+  them. Both are in the cache file name, so moving to different hardware just
+  builds a new engine.
+- Any export or load error falls back to PyTorch on the same device and is
+  logged, so a missing package can only make inference slower, never break it.
+- `auto` only picks runtimes whose packages are already installed, so
+  Ultralytics never pip-installs anything at runtime.
+- `GET /api/gpu` reports the plan (`runtime`) and what each loaded model is
+  using (`models`). The UI's accelerator panel shows the same information.
+- Measured on a 4-core CPU (Ultralytics 8.4, 1280×720 frames, mean of 40):
+
+  | Weights | PyTorch | OpenVINO |
+  |---|---|---|
+  | `yolov8n.pt` | 37 ms | 19 ms |
+  | `yolo11n.pt` (default) | 40 ms | 22 ms |
+  | `yolo26n.pt` | 42 ms | 22 ms |
+
+  Detections match between runtimes. YOLO11n is more accurate than YOLOv8n
+  (COCO mAP 39.5 vs 37.3) for about the same cost.
+
+INT8 on CPU (measured with `yolo11n`, 640×640, on a Xeon with AMX):
+
+| Mode | ms/frame |
+|---|---|
+| FP32 model, OpenVINO default (runs as BF16 on AMX) | 17.5 |
+| True FP32 (what CPUs without AMX run) | 30.6 |
+| INT8 | 19.5 |
+
+INT8 matched 98.9% of FP32's person detections over 200 frames from the bundled
+videos. On AMX CPUs it adds nothing, which is why `auto` skips it there.
+
+Install GPU extras with `pip install -r requirements.txt -r requirements-gpu.txt`,
+or build the image with `--build-arg ACCEL=gpu`.
 
 ## Models
 
 | Variable | Default | Description |
 |---|---|---|
 | `MODELS_DIR` | `models` | Where model weights live / are downloaded. |
-| `PERSON_MODEL` | `yolov8n.pt` | YOLOv8 weights (COCO). Person class = 0. |
+| `PERSON_MODEL` | `yolo11n.pt` | YOLO weights (COCO). Person class = 0. Any Ultralytics detector works (e.g. `yolo26n.pt`, `yolo11s.pt`). |
 | `EMPTY_SHELF_MODEL` | _(blank)_ | Optional custom `.pt` for UC-2 (out-of-stock). |
 | `SPILL_MODEL` | _(blank)_ | Optional custom `.pt` for UC-16 (spill). |
+| `POSE_MODEL` | `yolo11n-pose.pt` | Keypoint model for UC-4 / UC-13 / UC-20 hand and posture signals; replaces their person detector. Blank disables (original behaviour). |
+| `SEG_MODEL` | `sam2.1_t.pt` | Segment Anything weights for UC-16's spill outline (background thread, only while a spill is confirmed). Blank disables. See USE_CASES.md. |
+| `OPEN_VOCAB_MODEL` | `yoloe-26n-seg.pt` | Text-prompted YOLOE checkpoint for prompt-driven features (UC-16 wet-floor sign). Blank disables them. |
 
-> **Swapping the detector / AGPL note:** YOLOv8 is AGPL-3.0, which is why this
-> project is AGPL-3.0. To use a different license, replace the YOLOv8 dependency
+**Open-vocabulary (text-prompted) models.** `get_prompted_model([...prompts])`
+in `core/models.py` turns the YOLOE checkpoint into a detector for any list of
+text prompts. Each prompt set is exported and cached like the other models
+(OpenVINO on CPU, TensorRT on GPU), so the text encoder only runs on first use.
+The first export downloads the YOLOE weights and a MobileCLIP text encoder; on
+air-gapped hosts, run once with internet access and keep `EXPORT_DIR` on a
+persistent volume. If `clip-anytorch` is missing, prompted features switch off
+and log a warning.
+
+In zero-shot tests on the bundled videos, prompts were reliable for distinct
+objects (e.g. "wet floor sign") but **not** for empty shelf gaps, liquid spills
+or telling products apart ("salsa jar" vs "tortilla chips"). Those use cases
+keep their heuristics or optional trained weights. A YOLOE model fine-tuned on
+your own shelf images is the path to SKU-level results.
+
+> **Swapping the detector / AGPL note:** Ultralytics YOLO is AGPL-3.0, which is why this
+> project is AGPL-3.0. To use a different license, replace the Ultralytics dependency
 > (`ultralytics`) and the loader in `core/models.py` with a model under terms you
 > can accept, and remove `ultralytics` from `requirements.txt`.
 

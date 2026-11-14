@@ -25,7 +25,7 @@ A tracking algorithm that keeps a stable ID on each person/object across frames,
 so we can measure things like dwell time. Provided via the `supervision` library.
 
 ### COCO
-A common image dataset. The default YOLOv8 weights are trained on COCO, which
+A common image dataset. The default YOLO11 weights are trained on COCO, which
 includes a "person" class (used by the people-tracking use cases).
 
 ### CORS
@@ -68,7 +68,7 @@ A color overlay showing where activity concentrates over time (hot = busy).
 The Kubernetes object that exposes the app to the outside world at a hostname.
 
 ### Inference
-Running a trained model on new data (here: running YOLOv8 on a frame to detect
+Running a trained model on new data (here: running YOLO11 on a frame to detect
 things).
 
 ### JPEG
@@ -125,8 +125,10 @@ see [USE_CASES.md](USE_CASES.md).
 A persistent two-way browser↔server connection. Used to stream frames and metrics
 (`/ws/analyze`) and agent events (`/ws/agent`).
 
-### YOLOv8
-The object-detection model (by Ultralytics) used for detection. It is licensed
+### YOLO11 / YOLO11 Pose / YOLOE
+The Ultralytics models used here: YOLO11 detects people and objects, YOLO11
+Pose adds 17 body keypoints (hands, shoulders, hips; no identity), and YOLOE is
+an open-vocabulary detector you steer with text prompts. All are licensed
 **AGPL-3.0**, which is why this whole project is AGPL-3.0.
 
 ### Zone

@@ -15,6 +15,7 @@ from fastapi import APIRouter
 from app.config import get_settings
 from app.core import perf
 from app.core.models import device as resolved_device
+from app.core.models import loaded_models, plan_runtime
 
 router = APIRouter(prefix="/api/gpu", tags=["gpu"])
 
@@ -96,6 +97,10 @@ def gpu_status() -> dict:
         "device": dev,
         "configured_device": settings.device,
         "gpu": stats,
+        # Inference runtime: what auto-selection planned and what each loaded
+        # model is actually running on (e.g. tensorrt/fp16, openvino/fp32).
+        "runtime": vars(plan_runtime()),
+        "models": loaded_models(),
         # Active streams with their share of measured processing time; the UI
         # apportions utilization across use cases by these shares (the driver
         # only reports utilization per process, not per use case).

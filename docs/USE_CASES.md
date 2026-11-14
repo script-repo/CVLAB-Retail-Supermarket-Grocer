@@ -8,7 +8,7 @@ don't.
 
 | Pattern | Meaning |
 |---|---|
-| people-tracking | Detect + track people (YOLOv8 + ByteTrack) |
+| people-tracking | Detect + track people (YOLO11 + ByteTrack) |
 | shelf-vision | Analyze shelves/products (detection + OpenCV heuristics) |
 | loss-prevention | Behavior/anomaly cues for shrink & fraud |
 | product-recognition | Identify/inspect products or shipments |
@@ -31,7 +31,13 @@ merchandising/compliance gaps.
 
 ### UC-4 — Shrink / Loss Prevention & Theft Detection · `loss-prevention`
 Highlights suspicious behaviors (concealment, dwell near high-value goods) as
-loss-prevention cues.
+loss-prevention cues. With the pose model it counts **shelf-to-bag gestures**: a
+hand going into a bag within 3 s of reaching (`gesture_window_s`). Carrying a
+bag doesn't count. By default (`require_gesture`, on) only people who made such
+a gesture are flagged for review. On the bundled queue video this cut review
+events from 10 to 2. Set `require_gesture` to false to flag everyone who
+lingers near a bag (the old rule). It's also the rule used when the pose model
+is unavailable.
 
 ### UC-5 — Self-Checkout Fraud Detection · `loss-prevention` · **Zone**
 Monitors the self-checkout area for scan-avoidance / mis-scan patterns.
@@ -60,7 +66,9 @@ Emulates an aisle-scanning robot's view, checking shelves as it passes.
 Verifies electronic shelf labels are present and consistent.
 
 ### UC-13 — Staff Efficiency & Task Completion Monitoring · `task-ops` · **Zone**
-Tracks task areas to estimate staff activity and task completion.
+Tracks task areas to estimate staff activity and task completion. With the pose
+model, time-on-task only accrues while someone is **actively working** (hands
+at working height or reaching); `presence_s` still reports time in the zone.
 
 ### UC-14 — Age Verification at Self-Checkout · `privacy`
 Privacy-preserving age-estimation trigger for restricted items (anonymous, no
@@ -71,10 +79,38 @@ Watches fridge/freezer doors for open-too-long compliance events.
 
 ### UC-16 — Spill & Hazard Detection · `task-ops`
 Detects spills/obstructions on the floor as safety hazards. Optional custom
-model via `SPILL_MODEL`.
+model via `SPILL_MODEL`. A text-prompted YOLOE model (`OPEN_VOCAB_MODEL`) also
+looks for a **wet-floor sign**: one placed next to a confirmed spill marks it
+*cordoned*, stops the unattended timer and reports the response time
+(`response_s`). The spill remains an alert until it is cleaned up. People
+walking through are removed from the change mask (`exclude_people`, default on).
+
+**Spill outline with SAM (on by default, `SEG_MODEL=sam2.1_t.pt`; blank disables).** While a spill is
+confirmed, SAM 2.1-tiny is prompted every `outline_every_s` (3 s) with the spill
+box and its most interior changed point, in a background thread. The outline
+replaces the box and `spill_area_frac` is reported only if it passes a sanity
+check (≥50% inside the changed area, ≤25% of the floor).
+- Cost: about 2 s per run on CPU, a few tens of ms on GPU. While it runs it
+  competes for CPU with the stream: on 4 cores UC-16 went from ~40 to ~70
+  ms/frame during a spill (still within a 10 fps budget). Only runs while a
+  spill is confirmed.
+- It depends on a valid clean-floor reference frame, so it suits fixed cameras.
+  - On the bundled demo video, where the camera angle changes between clips,
+    one accepted outline traced the shelf base instead of the spill.
+  - Where the reference was valid, the outlines traced the wine accurately.
+- Check the outlines on your own footage; set `SEG_MODEL=` to turn it off.
 
 ### UC-17 — Visual Product Search for Shoppers · `product-recognition`
 Demonstrates "find similar products" visual search from a frame.
+
+**Search by example:** draw a zone around one example of each product on the
+first frame and rename the zone to the product's name (zone names are
+editable). YOLOE uses the examples as visual prompts and highlights every match
+in later frames. On the bundled shelf video, one example each found the salsa
+jars and the four teal tortilla-chip bags, and skipped the black bags. Setup
+takes about 5 s once, then about 70 ms/frame on CPU. Without zones it falls
+back to naming the largest COCO object. Text prompts ("salsa jar") did not work
+for this; examples do.
 
 ### UC-18 — Supply Chain & Receiving Dock Verification · `product-recognition`
 Verifies pallets/cases at the receiving dock against expectations.
@@ -84,13 +120,18 @@ Anonymous audience cues (e.g. approximate group size/attention) to adapt signage
 — no identification.
 
 ### UC-20 — Dwell-Time / Product Engagement Analysis · `people-tracking` · **Zone**
-Measures how long shoppers dwell in a zone to gauge product engagement.
+Measures how long shoppers dwell in a zone to gauge product engagement. With the
+pose model it also counts **product reaches** (arm raised or stretched to the
+display) per shopper: `product_reaches`, `shoppers_who_reached`.
 
 ---
 
 ## Models used
 
-- **YOLOv8** (Ultralytics, COCO weights) for people and common-object detection.
+- **YOLO11** (Ultralytics, COCO weights) for people and common-object detection.
+- **YOLO11 Pose** (17 body keypoints, no identity) for hand/posture signals in
+  UC-4, UC-13 and UC-20. Set `POSE_MODEL=` (blank) to turn it off.
+- **YOLOE-26** (open-vocabulary, text prompts) for UC-16's wet-floor-sign check.
 - **ByteTrack** (via `supervision`) for stable multi-object tracking and dwell.
 - **OpenCV** heuristics for shelf/spill/heatmap analysis where a bespoke model
   isn't required.

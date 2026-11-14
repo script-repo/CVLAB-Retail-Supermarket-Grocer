@@ -7,6 +7,7 @@ Start here, then dive into the topic you need.
 | [Getting started](GETTING_STARTED.md) | Plain-language setup (Docker or Python) + troubleshooting |
 | [Architecture](ARCHITECTURE.md) | Components, data flow, and the plug-in design |
 | [Configuration](CONFIGURATION.md) | Every environment variable |
+| [Training](TRAINING.md) | Pre-label store footage (SAM / YOLOE), review, train, plug in |
 | [Deployment](DEPLOYMENT.md) | Docker, single container, and the legacy k8s path |
 | [GitOps on NKP](gitops-nkp-pipeline.md) | GitHub → GHCR → Flux delivery path |
 | [Use cases](USE_CASES.md) | The 20 analyzers, patterns, and models |

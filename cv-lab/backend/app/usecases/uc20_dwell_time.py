@@ -12,12 +12,12 @@ import cv2
 import numpy as np
 import supervision as sv
 
-from app.core.models import get_person_model
+from app.core.models import get_person_model, get_pose_model
 from app.core.tracking import Tracker
 from app.schemas import AnalysisConfig
 
 from .base import BRAND_CYAN, BRAND_GREEN, BRAND_ORANGE, UseCaseAnalyzer, draw_banner, draw_chip, register
-from .common import PERSON, detect, zones_from_config, rect_pts
+from .common import detect_people, draw_skeleton, is_reaching, keypoints, rect_pts, zones_from_config
 
 
 @register
@@ -31,6 +31,11 @@ class DwellTimeAnalyzer(UseCaseAnalyzer):
         h, w = frame.shape[:2]
         self.w, self.h = w, h
         self.model = get_person_model()
+        # Pose adds product-interaction counting: a reach (wrist above the
+        # shoulders or stretched toward the shelf) by a shopper at the display.
+        self.pose = get_pose_model()
+        self.reaches: dict[int, int] = {}
+        self._reaching: dict[int, bool] = {}
         self.tracker = Tracker(frame_rate=self.fps)
         self.engage_s = float(config.params.get("engage_seconds", 3.0))
         # Support any number of drawn display zones (default to one centre zone).
@@ -44,7 +49,7 @@ class DwellTimeAnalyzer(UseCaseAnalyzer):
 
     def process_frame(self, frame: np.ndarray, timestamp_s: float) -> tuple[np.ndarray, dict[str, Any]]:
         self.frame_index += 1
-        people = detect(self.model, frame, classes=[PERSON])
+        people = detect_people(self.pose, self.model, frame)
         people = self.tracker.update(people, timestamp_s)
 
         # Trigger every zone; a shopper counts as "at display" if in ANY zone.
@@ -63,14 +68,23 @@ class DwellTimeAnalyzer(UseCaseAnalyzer):
 
         dwell_vals = []
         if in_zone.tracker_id is not None:
-            for b, tid in zip(in_zone.xyxy, in_zone.tracker_id):
+            for i, (b, tid) in enumerate(zip(in_zone.xyxy, in_zone.tracker_id)):
+                kp = keypoints(in_zone, i)
+                if kp is not None:
+                    reach = is_reaching(kp)
+                    if reach and not self._reaching.get(int(tid), False):
+                        self.reaches[int(tid)] = self.reaches.get(int(tid), 0) + 1
+                    self._reaching[int(tid)] = reach
+                    draw_skeleton(frame, kp, BRAND_ORANGE if reach else BRAND_CYAN)
                 d = self.tracker.dwell_seconds(int(tid))
                 dwell_vals.append(d)
                 engaged = d >= self.engage_s
                 if engaged:
                     self.engaged.add(int(tid))
                 col = BRAND_ORANGE if engaged else BRAND_CYAN
-                draw_chip(frame, f"#{int(tid)} {d:0.1f}s", (int(b[0]), max(18, int(b[1]))), col)
+                n_reach = self.reaches.get(int(tid), 0)
+                label = f"#{int(tid)} {d:0.1f}s" + (f"  reach x{n_reach}" if n_reach else "")
+                draw_chip(frame, label, (int(b[0]), max(18, int(b[1]))), col)
 
         # Draw every zone with its label and live count.
         overlay = frame.copy()
@@ -87,6 +101,8 @@ class DwellTimeAnalyzer(UseCaseAnalyzer):
             f"At display: {len(in_zone)}  ·  avg dwell {avg:0.1f}s  ·  "
             f"engaged {len(self.engaged)}  ·  zones {len(self.zones)}"
         )
+        if self.pose is not None:
+            headline += f"  ·  reaches {sum(self.reaches.values())}"
         draw_banner(frame, headline, alert=False)
         metrics = {
             "at_display": len(in_zone),
@@ -95,5 +111,8 @@ class DwellTimeAnalyzer(UseCaseAnalyzer):
             "engage_threshold_s": self.engage_s,
             "zones": len(self.zones),
             "per_zone": {name: c for (name, _), c in zip(self.zones, per_zone_counts)},
+            "pose": self.pose is not None,
+            "product_reaches": int(sum(self.reaches.values())),
+            "shoppers_who_reached": sum(1 for v in self.reaches.values() if v),
         }
         return frame, {"status": "ok", "headline": headline, "values": metrics}

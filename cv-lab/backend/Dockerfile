@@ -9,7 +9,17 @@
 # Deployment) and False otherwise. The app's DEVICE=auto setting (see
 # docs/CONFIGURATION.md) picks CUDA when available and falls back to CPU
 # automatically — no separate GPU image or build is needed.
+#
+# Inference runtime is also picked automatically (MODEL_FORMAT=auto): OpenVINO
+# on CPU (always installed), TensorRT FP16 on GPU when the image is built with
+#   --build-arg ACCEL=gpu      (adds requirements-gpu.txt, several GB larger)
+# Without it a GPU still runs PyTorch CUDA FP16. Mount a volume at
+# /app/backend/models/exported to keep exported models across restarts.
 FROM python:3.11-slim
+
+ARG ACCEL=cpu
+# --build-arg INT8=true adds nncf so CPUs without AMX can run an INT8 detector.
+ARG INT8=false
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -22,8 +32,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY backend/requirements.txt backend/requirements.txt
-RUN pip install -r backend/requirements.txt
+COPY backend/requirements.txt backend/requirements-gpu.txt backend/requirements-int8.txt backend/
+RUN pip install -r backend/requirements.txt \
+    && if [ "$ACCEL" = "gpu" ]; then pip install -r backend/requirements-gpu.txt; fi \
+    && if [ "$INT8" = "true" ]; then pip install -r backend/requirements-int8.txt; fi
 
 COPY backend backend
 COPY frontend frontend
@@ -31,7 +43,7 @@ COPY frontend frontend
 # Pre-fetch the COCO person model into the resolved models dir so the container
 # can run offline (models.py looks under MODELS_DIR first).
 RUN mkdir -p /app/backend/models && cd /app/backend/models \
-    && python -c "from ultralytics import YOLO; YOLO('yolov8n.pt')" || true
+    && python -c "from ultralytics import SAM, YOLO; [YOLO(w) for w in ('yolo11n.pt', 'yolo11n-pose.pt', 'yoloe-26n-seg.pt')]; SAM('sam2.1_t.pt')" || true
 
 WORKDIR /app/backend
 ENV FRONTEND_DIR=/app/frontend \

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -16,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api import agent, analyze, gpu, streams, videos
 from app.config import get_settings
 from app.core.agent import get_agent_runtime
+from app.core.models import warmup_models
 from app.core.nai_config import apply_saved
 from app.usecases import list_usecases
 
@@ -46,6 +48,14 @@ async def _start_agent() -> None:
     # Instantiate the agent runtime so its event-bus listener is registered
     # before the first analysis stream starts.
     get_agent_runtime()
+    # Load the shared COCO model in the background so the first analysis does
+    # not pay for model download / TensorRT or OpenVINO export. /healthz stays
+    # responsive meanwhile; an analysis started early just waits for the load.
+    if settings.model_warmup:
+        from app.usecases.uc16_spill import SIGN_PROMPTS
+
+        threading.Thread(target=warmup_models, args=([SIGN_PROMPTS],),
+                         name="model-warmup", daemon=True).start()
 
 
 @app.get("/healthz")

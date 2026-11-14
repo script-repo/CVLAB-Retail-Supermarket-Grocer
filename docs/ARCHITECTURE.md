@@ -20,7 +20,7 @@ flowchart TB
       R4["api/gpu.py — GPU stats"]
       P["core/pipeline.py — decode → analyze → encode"]
       U["usecases/*.py — one analyzer per use case"]
-      M["core/models.py — YOLOv8 loader"]
+      M["core/models.py — YOLO loader + runtime (TensorRT / OpenVINO)"]
       T["core/tracking.py — ByteTrack wrapper"]
       AG["core/agent.py — event bus + agent runtime"]
       L["core/llm.py — OpenAI-compatible client"]
@@ -55,7 +55,7 @@ cv-lab/backend/app/
 │   └── gpu.py         # GPU utilization stats
 ├── core/
 │   ├── pipeline.py    # frame loop: decode → analyze → JPEG encode
-│   ├── models.py      # lazy YOLOv8 model loading + device selection
+│   ├── models.py      # lazy YOLO loading, device + runtime (TensorRT/OpenVINO) selection
 │   ├── tracking.py    # ByteTrack-based multi-object tracker
 │   ├── agent.py       # event bus, work orders, agent runtime
 │   ├── llm.py         # OpenAI-compatible chat-completions client
@@ -101,7 +101,7 @@ class QueueAnalyzer(UseCaseAnalyzer):
 
 ## Computer-vision building blocks
 
-- **Detection:** Ultralytics **YOLOv8** (COCO weights; person class for
+- **Detection:** Ultralytics **YOLO11** (COCO weights; person class for
   people-tracking use cases). Optional custom `.pt` models for shelf/spill.
 - **Tracking:** `supervision` **ByteTrack** wrapper (`core/tracking.py`) gives
   stable IDs and dwell times.

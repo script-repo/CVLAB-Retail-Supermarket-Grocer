@@ -247,7 +247,7 @@ Build platform is `linux/amd64` unless your nodes are a different
 architecture.
 
 The Dockerfile is a CPU Python image: OpenCV/ffmpeg, PyTorch CPU wheels,
-YOLOv8n weights prefetched, process uid `1001`.
+YOLO11n, YOLO11n-pose and YOLOE-26n weights prefetched, process uid `1001`.
 
 ### 5. Actions updates the desired image tag in Git
 

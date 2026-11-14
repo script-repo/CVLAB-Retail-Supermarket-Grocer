@@ -87,7 +87,10 @@ spec:
               # Reconcile deps every start: pip skips already-satisfied packages
               # in /deps and only installs new/changed requirements (e.g. httpx).
               echo "Reconciling Python deps onto PVC (torch from PyPI is the CUDA build)..."
-              pip install --no-cache-dir --target=/deps -r /app/backend/requirements.txt
+              # requirements-gpu.txt adds TensorRT so MODEL_FORMAT=auto can build an
+              # FP16 engine (cached on this PVC under /deps/models/exported).
+              pip install --no-cache-dir --target=/deps -r /app/backend/requirements.txt \
+                -r /app/backend/requirements-gpu.txt
               touch /deps/.installed
               echo "Dependencies reconciled."
               # ultralytics pulls full opencv-python (needs libGL). Force the
@@ -98,9 +101,11 @@ spec:
               pip install --no-cache-dir --target=/deps --no-deps opencv-python-headless==4.10.0.84
               echo "Ensuring YOLO weights..."
               mkdir -p /deps/models
-              if [ ! -f /deps/models/yolov8n.pt ]; then
-                PYTHONPATH=/deps python -c "from ultralytics import YOLO; YOLO('/deps/models/yolov8n.pt')"
-              fi
+              for w in yolo11n.pt yolo11n-pose.pt yoloe-26n-seg.pt sam2.1_t.pt; do
+                if [ ! -f /deps/models/$w ]; then
+                  PYTHONPATH=/deps python -c "import sys; from ultralytics import SAM, YOLO; w = sys.argv[1]; (SAM if 'sam' in w else YOLO)(w)" /deps/models/$w
+                fi
+              done
           volumeMounts:
             - { name: src, mountPath: /src }
             - { name: deps, mountPath: /deps }
@@ -119,7 +124,13 @@ spec:
             - { name: STORAGE_BACKEND, value: "local" }
             - { name: LOCAL_STORAGE_DIR, value: "/data" }
             - { name: MODELS_DIR, value: /deps/models }
-            - { name: PERSON_MODEL, value: yolov8n.pt }
+            - { name: PERSON_MODEL, value: yolo11n.pt }
+            - { name: POSE_MODEL, value: yolo11n-pose.pt }
+            - { name: OPEN_VOCAB_MODEL, value: yoloe-26n-seg.pt }
+            - { name: SEG_MODEL, value: sam2.1_t.pt }
+            # auto -> TensorRT FP16 engine on this GPU (built once on first start,
+            # a few minutes; falls back to PyTorch CUDA FP16 if the build fails).
+            - { name: MODEL_FORMAT, value: auto }
             - { name: TARGET_FPS, value: "15" }
             - { name: MAX_STREAM_WIDTH, value: "960" }
             - { name: FRONTEND_DIR, value: /app/frontend }

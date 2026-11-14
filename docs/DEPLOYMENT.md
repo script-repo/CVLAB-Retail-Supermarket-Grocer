@@ -36,7 +36,11 @@ docker run --rm -p 8000:8000 \
 
 Add `-e NAI_BASE_URL=... -e NAI_API_KEY=... -e NAI_MODEL=...` to enable the LLM.
 For GPU, use an NVIDIA runtime (`--gpus all`) and an image with CUDA PyTorch (see
-the GPU manifest), and set `DEVICE=cuda:0`.
+the GPU manifest), and set `DEVICE=cuda:0`. Build with `--build-arg ACCEL=gpu`
+to include TensorRT, so inference runs as a TensorRT FP16 engine; without it the
+GPU runs PyTorch in FP16. CPU-only hosts use OpenVINO automatically. Mount a
+volume at `/app/backend/models/exported` (or set `EXPORT_DIR`) so the exported
+model isn't rebuilt on every container start.
 
 ## 3. Kubernetes (legacy hand-apply)
 

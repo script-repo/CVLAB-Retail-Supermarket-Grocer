@@ -87,7 +87,7 @@ uvicorn app.main:app --reload --port 8000
 # open http://localhost:8000
 ```
 
-CPU works (slower). With an NVIDIA GPU + CUDA-enabled PyTorch, set `DEVICE=cuda:0`.
+CPU works (slower; OpenVINO is used automatically to speed it up). With an NVIDIA GPU + CUDA-enabled PyTorch, set `DEVICE=cuda:0`; add `pip install -r requirements-gpu.txt` for TensorRT FP16.
 
 New to this? Read [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) for a
 plain-language walkthrough and troubleshooting.
@@ -117,7 +117,7 @@ flowchart LR
     Agent -->|"events / work orders / report"| UI
 ```
 
-Frames are decoded with OpenCV, run through the selected analyzer (YOLOv8 +
+Frames are decoded with OpenCV, run through the selected analyzer (YOLO11 +
 `supervision` trackers/zones, or lightweight OpenCV heuristics), re-encoded as
 JPEG, and pushed to the browser over a WebSocket alongside a JSON metrics message.
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
@@ -179,6 +179,7 @@ same flow runs on deterministic local logic, so it always works offline. See
 - [Getting started](docs/GETTING_STARTED.md) — plain-language setup + troubleshooting
 - [Architecture](docs/ARCHITECTURE.md) — components and data flow
 - [Configuration](docs/CONFIGURATION.md) — every environment variable
+- [Training](docs/TRAINING.md) — pre-label your footage, train, plug models in
 - [Deployment](docs/DEPLOYMENT.md) — Docker, local, and the legacy k8s path
 - [GitOps on NKP](docs/gitops-nkp-pipeline.md) — live GitHub → GHCR → Flux path
 - [Use cases](docs/USE_CASES.md) — the 20 analyzers in detail
@@ -194,6 +195,7 @@ useful:
 | Variable | Default | Purpose |
 |---|---|---|
 | `DEVICE` | `auto` | `auto` / `cpu` / `cuda:0` |
+| `MODEL_FORMAT` | `auto` | Inference runtime: TensorRT FP16 on GPU, OpenVINO on CPU (see [CONFIGURATION](docs/CONFIGURATION.md)) |
 | `STORAGE_BACKEND` | `auto` | `auto` / `s3` / `local` |
 | `NAI_BASE_URL` | _(blank)_ | OpenAI-compatible LLM endpoint (blank = disabled) |
 | `TARGET_FPS` | `12` | Server-side stream throttle |
@@ -217,7 +219,7 @@ pipeline. `cv-lab/deploy/k8s/` is a legacy hand-apply method.
 ## Tech stack
 
 - **Backend:** FastAPI, Uvicorn, WebSockets
-- **Computer vision:** Ultralytics YOLOv8, `supervision` (ByteTrack, zones,
+- **Computer vision:** Ultralytics YOLO11 (+ Pose, YOLOE), `supervision` (ByteTrack, zones,
   annotators), OpenCV, NumPy
 - **Storage:** boto3 → any S3-compatible store (Nutanix Objects, MinIO, AWS S3),
   with a local-disk fallback
@@ -229,11 +231,11 @@ pipeline. `cv-lab/deploy/k8s/` is a legacy hand-apply method.
 This project is licensed under the **GNU Affero General Public License v3.0
 (AGPL-3.0)** — see [LICENSE](LICENSE).
 
-> **Why AGPL?** A core dependency, **Ultralytics YOLOv8, is AGPL-3.0**. Because
+> **Why AGPL?** A core dependency, **Ultralytics YOLO (YOLO11 / YOLOE), is AGPL-3.0**. Because
 > this app serves the model over a network, AGPL's network-use clause applies:
 > anyone who runs a modified version as a network service must offer the
 > corresponding source. If you need different terms, you must replace the
-> YOLOv8 dependency and/or obtain a commercial Ultralytics license. See
+> Ultralytics dependency and/or obtain a commercial Ultralytics license. See
 > [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for swapping the detector.
 
 Third-party components retain their own licenses.

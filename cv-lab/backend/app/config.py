@@ -34,10 +34,34 @@ class Settings(BaseSettings):
 
     # --- Models ---
     models_dir: Path = Path("models")
-    person_model: str = "yolov8n.pt"                     # COCO; person class = 0
+    person_model: str = "yolo11n.pt"                     # COCO; person class = 0
     empty_shelf_model: str = ""                          # optional .pt for UC-2
     spill_model: str = ""                                # optional .pt for UC-16
+    # Pose model (17 COCO keypoints). Adds hand/posture signals to UC-4, UC-13 and
+    # UC-20 and replaces their person detector. Blank disables them.
+    pose_model: str = "yolo11n-pose.pt"
+    # Segment Anything model for UC-16's spill outline. Runs in a background
+    # thread every few seconds while a spill is confirmed (~2 s per run on CPU,
+    # tens of ms on GPU). Blank disables.
+    seg_model: str = "sam2.1_t.pt"
+    # Open-vocabulary (text-prompted) YOLOE checkpoint for prompt-driven roles,
+    # e.g. UC-16's wet-floor-sign check. Blank disables those roles.
+    open_vocab_model: str = "yoloe-26n-seg.pt"
     device: str = "auto"                                 # auto | cpu | cuda:0
+    # Inference runtime. "auto" picks the fastest one for the hardware:
+    # GPU -> TensorRT FP16 (if tensorrt installed) else PyTorch CUDA FP16;
+    # CPU -> OpenVINO (if installed) else ONNX Runtime else PyTorch.
+    model_format: str = "auto"                           # auto | pytorch | tensorrt | openvino | onnx
+    model_fp16: bool | None = None                       # None = FP16 on GPU, FP32 on CPU
+    model_imgsz: int = 640                               # inference / export input size
+    export_dir: Path | None = None                       # default: <models_dir>/exported
+    # INT8 for CPU/OpenVINO detectors. auto = only on CPUs without BF16/AMX (where
+    # it is ~1.5x faster; AMX CPUs already run FP32 models in BF16) and when nncf
+    # is installed and calibration frames are available.
+    model_int8: str = "auto"                             # auto | true | false
+    calib_dir: Path | None = None                        # images for INT8 calibration
+    calib_frames: int = 300                              # Ultralytics recommends >=300
+    model_warmup: bool = True                            # load + export COCO, pose, YOLOE models at startup
 
     # --- LLM inference endpoint (any OpenAI-compatible API) ---
     # e.g. Nutanix Enterprise AI (NAI), vLLM, Ollama, OpenAI. Leave blank to run

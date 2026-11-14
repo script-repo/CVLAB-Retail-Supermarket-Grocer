@@ -30,7 +30,7 @@ const USE_CASES = [
       "Prism Central / NCM X-Play — runbooks on exception"
     ],
     models: [
-      { name: "YOLOv8 (COCO)", role: "Shopper + product/bag detection", why: "One fast model covers people and 80 everyday object classes, so a single pass detects shoppers, baskets and items at the edge." },
+      { name: "YOLO11 (COCO)", role: "Shopper + product/bag detection", why: "One fast model covers people and 80 everyday object classes, so a single pass detects shoppers, baskets and items at the edge." },
       { name: "ByteTrack (Supervision)", role: "Multi-object tracking / stable ID", why: "Training-free tracker keeps one consistent shopper ID through the whole journey for cart association." },
       { name: "LineZone (Supervision)", role: "Exit-line crossing event", why: "Converts a tracked path into a discrete 'left the store' checkout event." }
     ]
@@ -94,7 +94,8 @@ const USE_CASES = [
       "Privacy: behaviour-only — no facial recognition / no identity store"
     ],
     models: [
-      { name: "YOLOv8 (COCO)", role: "Person + bag (backpack/handbag/suitcase) detection", why: "Detects the actors and the bags involved without any biometric model." },
+      { name: "YOLO11 Pose (17 keypoints)", role: "Wrist tracking → shelf-to-bag gestures", why: "Counts a hand going into a bag shortly after reaching, and by default only people who made such a gesture are flagged, ignoring shoppers who just linger with a bag. Body keypoints only — no face or identity." },
+      { name: "YOLO11 (COCO)", role: "Person + bag (backpack/handbag/suitcase) detection", why: "Detects the actors and the bags involved without any biometric model." },
       { name: "ByteTrack (Supervision)", role: "Per-person dwell timing", why: "Sustained loitering near a shelf is a key behavioural signal; the tracker measures it per anonymous ID." },
       { name: "Behaviour heuristic", role: "Dwell + bag-proximity → review event", why: "Combines signals into a staff 'review event' — flags behaviour for a human to judge, never a 'confirmed theft'." }
     ]
@@ -116,7 +117,7 @@ const USE_CASES = [
       "Prism Central / X-Play — attendant alert automation"
     ],
     models: [
-      { name: "YOLOv8 (COCO)", role: "Item detection entering the bagging zone", why: "Counts items physically bagged independent of what the scanner saw." },
+      { name: "YOLO11 (COCO)", role: "Item detection entering the bagging zone", why: "Counts items physically bagged independent of what the scanner saw." },
       { name: "PolygonZone (Supervision)", role: "Bagging-area gating", why: "Restricts counting to the bag platform so only relevant items are reconciled." },
       { name: "POS reconciliation logic", role: "Bagged-vs-scanned mismatch", why: "Compares the vision item count to the POS scan stream and raises skipped-scan alerts." }
     ]
@@ -138,7 +139,7 @@ const USE_CASES = [
       "Prism Central / X-Play — staffing trigger automation"
     ],
     models: [
-      { name: "YOLOv8 (COCO person)", role: "Shopper detection", why: "Fast, accurate person detector suitable for top-down crowd views at the edge." },
+      { name: "YOLO11 (COCO person)", role: "Shopper detection", why: "Fast, accurate person detector suitable for top-down crowd views at the edge." },
       { name: "ByteTrack (Supervision)", role: "Per-shopper dwell", why: "Gives each queuer a stable ID so dwell/wait can be measured." },
       { name: "PolygonZone + queueing estimate", role: "Count in zone → wait time", why: "Counts people inside the drawn queue polygon and converts to wait via service-time × count ÷ lanes." }
     ]
@@ -160,7 +161,7 @@ const USE_CASES = [
       "Privacy: anonymous tracks only, no identity"
     ],
     models: [
-      { name: "YOLOv8 (COCO person)", role: "Shopper detection", why: "Detects every shopper for accumulation into the heat map." },
+      { name: "YOLO11 (COCO person)", role: "Shopper detection", why: "Detects every shopper for accumulation into the heat map." },
       { name: "ByteTrack (Supervision)", role: "Anonymous path tracking", why: "Builds movement traces without storing who anyone is." },
       { name: "HeatMapAnnotator + TraceAnnotator", role: "Density & flow visualization", why: "Accumulates occupancy over time and draws flow paths for layout/merchandising decisions." }
     ]
@@ -203,7 +204,7 @@ const USE_CASES = [
       "Prism Central — fleet monitoring of cart devices"
     ],
     models: [
-      { name: "YOLOv8 (COCO)", role: "In-basket product detection", why: "Recognizes grocery items/containers placed in the cart; production swaps in a SKU-trained head." },
+      { name: "YOLO11 (COCO)", role: "In-basket product detection", why: "Recognizes grocery items/containers placed in the cart; production swaps in a SKU-trained head." },
       { name: "PolygonZone (Supervision)", role: "Cart/basket region gating", why: "Only items inside the basket polygon count toward the cart." },
       { name: "Catalog price map", role: "Running cart + subtotal", why: "Maps detected classes to prices to maintain a live cart total." }
     ]
@@ -225,7 +226,7 @@ const USE_CASES = [
       "Litmus Unify (MQTT) — 'remove from display' task"
     ],
     models: [
-      { name: "YOLOv8 (COCO produce)", role: "Detect apples/bananas/oranges/etc.", why: "Locates individual produce items so each can be scored separately." },
+      { name: "YOLO11 (COCO produce)", role: "Detect apples/bananas/oranges/etc.", why: "Locates individual produce items so each can be scored separately." },
       { name: "Brown/HSV defect heuristic (OpenCV)", role: "Spoilage / bruise scoring", why: "Fraction of brown/dark pixels per item is a fast freshness proxy needing no training." },
       { name: "Roboflow produce-defect model (optional)", role: "Fine-grained grading", why: "Drop-in upgrade for true defect classification when accuracy matters." }
     ]
@@ -249,7 +250,7 @@ const USE_CASES = [
     models: [
       { name: "Edge-density gap audit (OpenCV)", role: "Section-by-section stock-gap detection", why: "As the simulated scan sweep passes each shelf section, low edge-density marks an empty facing — no training required." },
       { name: "Sweep scheduler", role: "Models the robot's scanning pass", why: "Drives progress and per-section auditing to mimic an autonomous shelf-audit run." },
-      { name: "YOLOv8 (optional)", role: "Product/label detection", why: "Adds SKU/label recognition when on-robot GPU is available." }
+      { name: "YOLO11 (optional)", role: "Product/label detection", why: "Adds SKU/label recognition when on-robot GPU is available." }
     ]
   },
   {
@@ -290,7 +291,8 @@ const USE_CASES = [
       "Privacy: presence-only, worker not identified"
     ],
     models: [
-      { name: "YOLOv8 (COCO person)", role: "Staff presence in the task zone", why: "Detects that someone is working the zone without identifying who." },
+      { name: "YOLO11 Pose (17 keypoints)", role: "Working-posture check", why: "Time-on-task only counts while hands are at working height or reaching, so standing idle in the area doesn't complete the task." },
+      { name: "YOLO11 (COCO person)", role: "Staff presence in the task zone", why: "Detects that someone is working the zone without identifying who." },
       { name: "PolygonZone (Supervision)", role: "Task-area gating", why: "Restricts presence detection to the assigned task polygon." },
       { name: "State machine (pending→in-progress→complete)", role: "Task lifecycle + time-on-task", why: "Turns presence + dwell into an objective completion signal." }
     ]
@@ -312,7 +314,7 @@ const USE_CASES = [
       "Prism Central / X-Play — attendant dispatch"
     ],
     models: [
-      { name: "YOLOv8 (COCO person)", role: "Shopper-present detection only", why: "Confirms a shopper is at the terminal to drive the workflow; deliberately no age or identity inference." },
+      { name: "YOLO11 (COCO person)", role: "Shopper-present detection only", why: "Confirms a shopper is at the terminal to drive the workflow; deliberately no age or identity inference." },
       { name: "Workflow state machine", role: "Age-check → staff assist → approved", why: "Camera handles presence and hand-off; the human associate makes the age decision." }
     ]
   },
@@ -354,6 +356,8 @@ const USE_CASES = [
       "Prism Central / X-Play — safety response runbook"
     ],
     models: [
+      { name: "SAM 2.1-tiny (Segment Anything)", role: "Spill outline", why: "Traces the exact spill shape from the detected region and reports its area, so the work order shows how big the spill is." },
+      { name: "YOLOE-26 (open-vocabulary, text prompt)", role: "Wet-floor sign detection", why: "Prompted with \"wet floor sign\" — no training. A sign next to the spill marks it cordoned and records the response time." },
       { name: "Roboflow spill / wet-floor YOLOv8 (optional weights)", role: "Spill region detection", why: "Trained on wet-floor/spill imagery; drops into the registry for accurate hazard segmentation." },
       { name: "Background-subtraction heuristic (OpenCV)", role: "New-on-floor region + persistence", why: "Detects a new persistent region on the floor and only alerts once it stays put, reducing false positives — works with no weights." }
     ]
@@ -375,7 +379,8 @@ const USE_CASES = [
       "Litmus Unify (MQTT) — kiosk request/response"
     ],
     models: [
-      { name: "YOLOv8 (COCO)", role: "Identify the held / prominent product", why: "Detects the largest object presented to the camera as the search subject." },
+      { name: "YOLOE-26 (visual prompts)", role: "Search by example", why: "Draw a box around one example of a product and name it; YOLOE finds every matching product — specific SKUs rather than generic COCO classes — with no training." },
+      { name: "YOLO11 (COCO)", role: "Identify the held / prominent product", why: "Detects the largest object presented to the camera as the search subject." },
       { name: "Grounding DINO (optional, open-vocab)", role: "Arbitrary-SKU / text-prompted match", why: "Open-vocabulary detection or an embedding index handles SKUs beyond the COCO classes." },
       { name: "Catalog → aisle map", role: "Locate the matched product", why: "Maps the recognized product to its aisle/bay for shopper directions." }
     ]
@@ -419,7 +424,7 @@ const USE_CASES = [
       "Prism Central — signage device fleet"
     ],
     models: [
-      { name: "YOLOv8 (COCO person)", role: "Anonymous audience presence", why: "Counts shoppers near the display without any identity or demographic inference." },
+      { name: "YOLO11 (COCO person)", role: "Anonymous audience presence", why: "Counts shoppers near the display without any identity or demographic inference." },
       { name: "ByteTrack (Supervision)", role: "Anonymous dwell timing", why: "Measures how long an anonymous track lingers to decide when to trigger a promotion." },
       { name: "Dwell trigger", role: "Proximity/dwell → contextual promo", why: "Fires the signage change purely on dwell, keeping the experience privacy-safe." }
     ]
@@ -441,7 +446,8 @@ const USE_CASES = [
       "Privacy: anonymous tracks only"
     ],
     models: [
-      { name: "YOLOv8 (COCO person)", role: "Shopper detection at the display", why: "Detects shoppers entering the product zone for engagement measurement." },
+      { name: "YOLO11 Pose (17 keypoints)", role: "Product-reach counting", why: "Counts reaches (arm raised or stretched to the display) per shopper — a direct interaction signal on top of dwell time." },
+      { name: "YOLO11 (COCO person)", role: "Shopper detection at the display", why: "Detects shoppers entering the product zone for engagement measurement." },
       { name: "ByteTrack (Supervision)", role: "Per-shopper dwell", why: "Tracks each anonymous shopper to time their dwell at the display." },
       { name: "PolygonZone + dwell threshold", role: "Engagement vs pass-by", why: "Sustained dwell inside the display polygon counts as an engagement (conversion proxy); a brief pass does not." }
     ]
