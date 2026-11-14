@@ -31,7 +31,10 @@ merchandising/compliance gaps.
 
 ### UC-4 — Shrink / Loss Prevention & Theft Detection · `loss-prevention`
 Highlights suspicious behaviors (concealment, dwell near high-value goods) as
-loss-prevention cues.
+loss-prevention cues. With the pose model it counts **shelf-to-bag gestures**: a
+hand going into a bag within 3 s of reaching (`gesture_window_s`). Carrying a
+bag doesn't count. Set the `require_gesture` param to flag only people who made
+one. On the bundled queue video this cut review events from 10 to 2.
 
 ### UC-5 — Self-Checkout Fraud Detection · `loss-prevention` · **Zone**
 Monitors the self-checkout area for scan-avoidance / mis-scan patterns.
@@ -60,7 +63,9 @@ Emulates an aisle-scanning robot's view, checking shelves as it passes.
 Verifies electronic shelf labels are present and consistent.
 
 ### UC-13 — Staff Efficiency & Task Completion Monitoring · `task-ops` · **Zone**
-Tracks task areas to estimate staff activity and task completion.
+Tracks task areas to estimate staff activity and task completion. With the pose
+model, time-on-task only accrues while someone is **actively working** (hands
+at working height or reaching); `presence_s` still reports time in the zone.
 
 ### UC-14 — Age Verification at Self-Checkout · `privacy`
 Privacy-preserving age-estimation trigger for restricted items (anonymous, no
@@ -87,13 +92,18 @@ Anonymous audience cues (e.g. approximate group size/attention) to adapt signage
 — no identification.
 
 ### UC-20 — Dwell-Time / Product Engagement Analysis · `people-tracking` · **Zone**
-Measures how long shoppers dwell in a zone to gauge product engagement.
+Measures how long shoppers dwell in a zone to gauge product engagement. With the
+pose model it also counts **product reaches** (arm raised or stretched to the
+display) per shopper: `product_reaches`, `shoppers_who_reached`.
 
 ---
 
 ## Models used
 
-- **YOLOv8** (Ultralytics, COCO weights) for people and common-object detection.
+- **YOLO11** (Ultralytics, COCO weights) for people and common-object detection.
+- **YOLO11 Pose** (17 body keypoints, no identity) for hand/posture signals in
+  UC-4, UC-13 and UC-20. Set `POSE_MODEL=` (blank) to turn it off.
+- **YOLOE-26** (open-vocabulary, text prompts) for UC-16's wet-floor-sign check.
 - **ByteTrack** (via `supervision`) for stable multi-object tracking and dwell.
 - **OpenCV** heuristics for shelf/spill/heatmap analysis where a bespoke model
   isn't required.

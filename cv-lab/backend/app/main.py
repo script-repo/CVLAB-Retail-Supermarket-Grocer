@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api import agent, analyze, gpu, streams, videos
 from app.config import get_settings
 from app.core.agent import get_agent_runtime
-from app.core.models import warmup_default_model
+from app.core.models import warmup_models
 from app.core.nai_config import apply_saved
 from app.usecases import list_usecases
 
@@ -52,7 +52,10 @@ async def _start_agent() -> None:
     # not pay for model download / TensorRT or OpenVINO export. /healthz stays
     # responsive meanwhile; an analysis started early just waits for the load.
     if settings.model_warmup:
-        threading.Thread(target=warmup_default_model, name="model-warmup", daemon=True).start()
+        from app.usecases.uc16_spill import SIGN_PROMPTS
+
+        threading.Thread(target=warmup_models, args=([SIGN_PROMPTS],),
+                         name="model-warmup", daemon=True).start()
 
 
 @app.get("/healthz")

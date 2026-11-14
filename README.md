@@ -117,7 +117,7 @@ flowchart LR
     Agent -->|"events / work orders / report"| UI
 ```
 
-Frames are decoded with OpenCV, run through the selected analyzer (YOLOv8 +
+Frames are decoded with OpenCV, run through the selected analyzer (YOLO11 +
 `supervision` trackers/zones, or lightweight OpenCV heuristics), re-encoded as
 JPEG, and pushed to the browser over a WebSocket alongside a JSON metrics message.
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
@@ -218,7 +218,7 @@ pipeline. `cv-lab/deploy/k8s/` is a legacy hand-apply method.
 ## Tech stack
 
 - **Backend:** FastAPI, Uvicorn, WebSockets
-- **Computer vision:** Ultralytics YOLOv8, `supervision` (ByteTrack, zones,
+- **Computer vision:** Ultralytics YOLO11 (+ Pose, YOLOE), `supervision` (ByteTrack, zones,
   annotators), OpenCV, NumPy
 - **Storage:** boto3 → any S3-compatible store (Nutanix Objects, MinIO, AWS S3),
   with a local-disk fallback
@@ -230,11 +230,11 @@ pipeline. `cv-lab/deploy/k8s/` is a legacy hand-apply method.
 This project is licensed under the **GNU Affero General Public License v3.0
 (AGPL-3.0)** — see [LICENSE](LICENSE).
 
-> **Why AGPL?** A core dependency, **Ultralytics YOLOv8, is AGPL-3.0**. Because
+> **Why AGPL?** A core dependency, **Ultralytics YOLO (YOLO11 / YOLOE), is AGPL-3.0**. Because
 > this app serves the model over a network, AGPL's network-use clause applies:
 > anyone who runs a modified version as a network service must offer the
 > corresponding source. If you need different terms, you must replace the
-> YOLOv8 dependency and/or obtain a commercial Ultralytics license. See
+> Ultralytics dependency and/or obtain a commercial Ultralytics license. See
 > [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for swapping the detector.
 
 Third-party components retain their own licenses.

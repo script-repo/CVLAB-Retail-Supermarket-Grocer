@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     person_model: str = "yolo11n.pt"                     # COCO; person class = 0
     empty_shelf_model: str = ""                          # optional .pt for UC-2
     spill_model: str = ""                                # optional .pt for UC-16
+    # Pose model (17 COCO keypoints). Adds hand/posture signals to UC-4, UC-13 and
+    # UC-20 and replaces their person detector. Blank disables them.
+    pose_model: str = "yolo11n-pose.pt"
     # Open-vocabulary (text-prompted) YOLOE checkpoint for prompt-driven roles,
     # e.g. UC-16's wet-floor-sign check. Blank disables those roles.
     open_vocab_model: str = "yoloe-26n-seg.pt"
@@ -48,7 +51,7 @@ class Settings(BaseSettings):
     model_fp16: bool | None = None                       # None = FP16 on GPU, FP32 on CPU
     model_imgsz: int = 640                               # inference / export input size
     export_dir: Path | None = None                       # default: <models_dir>/exported
-    model_warmup: bool = True                            # load + export the COCO model at startup
+    model_warmup: bool = True                            # load + export COCO, pose, YOLOE models at startup
 
     # --- LLM inference endpoint (any OpenAI-compatible API) ---
     # e.g. Nutanix Enterprise AI (NAI), vLLM, Ollama, OpenAI. Leave blank to run

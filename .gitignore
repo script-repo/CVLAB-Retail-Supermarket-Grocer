@@ -35,6 +35,7 @@ _s3cache/
 **/backend/models/*.pt
 **/models/exported/
 *_openvino_model/
+mobileclip*.ts
 
 # --- Media / uploads ---
 *.mp4

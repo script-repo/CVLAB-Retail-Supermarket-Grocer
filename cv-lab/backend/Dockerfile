@@ -40,7 +40,7 @@ COPY frontend frontend
 # Pre-fetch the COCO person model into the resolved models dir so the container
 # can run offline (models.py looks under MODELS_DIR first).
 RUN mkdir -p /app/backend/models && cd /app/backend/models \
-    && python -c "from ultralytics import YOLO; YOLO('yolo11n.pt')" || true
+    && python -c "from ultralytics import YOLO; [YOLO(w) for w in ('yolo11n.pt', 'yolo11n-pose.pt', 'yoloe-26n-seg.pt')]" || true
 
 WORKDIR /app/backend
 ENV FRONTEND_DIR=/app/frontend \

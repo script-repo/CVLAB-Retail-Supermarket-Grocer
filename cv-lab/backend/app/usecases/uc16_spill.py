@@ -30,7 +30,7 @@ from app.schemas import AnalysisConfig
 from .base import (BRAND_CYAN, BRAND_ORANGE, BRAND_RED, UseCaseAnalyzer, draw_banner,
                    polygons_to_pixels, register)
 
-_SIGN_PROMPTS = ["wet floor sign"]
+SIGN_PROMPTS = ["wet floor sign"]
 
 
 @register
@@ -70,7 +70,7 @@ class SpillAnalyzer(UseCaseAnalyzer):
 
         # Wet-floor-sign check (response tracking). Signs are static, so a few
         # checks per second are plenty and keep the CPU cost low.
-        prompts = config.params.get("sign_prompts") or _SIGN_PROMPTS
+        prompts = config.params.get("sign_prompts") or SIGN_PROMPTS
         if isinstance(prompts, str):
             prompts = [p for p in prompts.split(",") if p.strip()]
         self.sign_model = get_prompted_model(prompts)

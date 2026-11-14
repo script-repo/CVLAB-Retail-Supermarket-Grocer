@@ -317,12 +317,20 @@ def loaded_models() -> list[dict]:
         return [m.info() for m in _cache.values()]
 
 
-def warmup_default_model() -> None:
-    """Load (and, on first run, export) the shared COCO model ahead of time."""
+def warmup_models(prompt_sets: list[list[str]] | None = None) -> None:
+    """Load (and, on first run, export) the shared models ahead of time.
+
+    Runs in a background thread at startup: the COCO detector first, then the
+    pose model, then each open-vocabulary prompt set. On GPU, every one of
+    these may need a TensorRT build of a few minutes.
+    """
     try:
         get_person_model()
     except Exception as exc:  # noqa: BLE001
         logger.warning("Model warm-up failed: %s", exc)
+    get_pose_model()
+    for prompts in prompt_sets or []:
+        get_prompted_model(prompts)
 
 
 def get_person_model():
@@ -355,6 +363,18 @@ def get_prompted_model(prompts: list[str] | tuple[str, ...]):
         return load_yolo(name, tuple(p.strip() for p in prompts if p.strip()))
     except Exception as exc:  # noqa: BLE001
         logger.warning("Open-vocabulary model '%s' unavailable: %s", name, exc)
+        return None
+
+
+def get_pose_model():
+    """Keypoint model (``POSE_MODEL``), or None when blank / unavailable."""
+    name = get_settings().pose_model
+    if not name:
+        return None
+    try:
+        return load_yolo(name)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Pose model '%s' unavailable: %s", name, exc)
         return None
 
 

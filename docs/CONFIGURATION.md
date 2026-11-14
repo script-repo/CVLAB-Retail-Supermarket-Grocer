@@ -69,6 +69,7 @@ or build the image with `--build-arg ACCEL=gpu`.
 | `PERSON_MODEL` | `yolo11n.pt` | YOLO weights (COCO). Person class = 0. Any Ultralytics detector works (e.g. `yolo26n.pt`, `yolo11s.pt`). |
 | `EMPTY_SHELF_MODEL` | _(blank)_ | Optional custom `.pt` for UC-2 (out-of-stock). |
 | `SPILL_MODEL` | _(blank)_ | Optional custom `.pt` for UC-16 (spill). |
+| `POSE_MODEL` | `yolo11n-pose.pt` | Keypoint model for UC-4 / UC-13 / UC-20 hand and posture signals; replaces their person detector. Blank disables (original behaviour). |
 | `OPEN_VOCAB_MODEL` | `yoloe-26n-seg.pt` | Text-prompted YOLOE checkpoint for prompt-driven features (UC-16 wet-floor sign). Blank disables them. |
 
 **Open-vocabulary (text-prompted) models.** `get_prompted_model([...prompts])`
@@ -86,8 +87,8 @@ or telling products apart ("salsa jar" vs "tortilla chips"). Those use cases
 keep their heuristics or optional trained weights. A YOLOE model fine-tuned on
 your own shelf images is the path to SKU-level results.
 
-> **Swapping the detector / AGPL note:** YOLOv8 is AGPL-3.0, which is why this
-> project is AGPL-3.0. To use a different license, replace the YOLOv8 dependency
+> **Swapping the detector / AGPL note:** Ultralytics YOLO is AGPL-3.0, which is why this
+> project is AGPL-3.0. To use a different license, replace the Ultralytics dependency
 > (`ultralytics`) and the loader in `core/models.py` with a model under terms you
 > can accept, and remove `ultralytics` from `requirements.txt`.
 

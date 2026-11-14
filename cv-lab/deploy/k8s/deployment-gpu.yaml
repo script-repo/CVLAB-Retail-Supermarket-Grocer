@@ -101,9 +101,11 @@ spec:
               pip install --no-cache-dir --target=/deps --no-deps opencv-python-headless==4.10.0.84
               echo "Ensuring YOLO weights..."
               mkdir -p /deps/models
-              if [ ! -f /deps/models/yolo11n.pt ]; then
-                PYTHONPATH=/deps python -c "from ultralytics import YOLO; YOLO('/deps/models/yolo11n.pt')"
-              fi
+              for w in yolo11n.pt yolo11n-pose.pt yoloe-26n-seg.pt; do
+                if [ ! -f /deps/models/$w ]; then
+                  PYTHONPATH=/deps python -c "from ultralytics import YOLO; YOLO('/deps/models/$w')"
+                fi
+              done
           volumeMounts:
             - { name: src, mountPath: /src }
             - { name: deps, mountPath: /deps }
@@ -123,6 +125,8 @@ spec:
             - { name: LOCAL_STORAGE_DIR, value: "/data" }
             - { name: MODELS_DIR, value: /deps/models }
             - { name: PERSON_MODEL, value: yolo11n.pt }
+            - { name: POSE_MODEL, value: yolo11n-pose.pt }
+            - { name: OPEN_VOCAB_MODEL, value: yoloe-26n-seg.pt }
             # auto -> TensorRT FP16 engine on this GPU (built once on first start,
             # a few minutes; falls back to PyTorch CUDA FP16 if the build fails).
             - { name: MODEL_FORMAT, value: auto }

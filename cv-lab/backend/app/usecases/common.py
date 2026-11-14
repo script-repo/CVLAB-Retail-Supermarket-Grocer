@@ -161,3 +161,80 @@ def text_like_regions(gray: np.ndarray, mask: np.ndarray, min_area: int = 60, ma
         if min_area <= area <= max_area and 1.5 <= ar <= 12:
             boxes.append((x, y, ww, hh))
     return boxes
+
+
+# Pose (COCO 17-keypoint) helpers --------------------------------------------
+# Keypoint indices used here: shoulders 5/6, wrists 9/10, hips 11/12.
+L_SHOULDER, R_SHOULDER, L_WRIST, R_WRIST, L_HIP, R_HIP = 5, 6, 9, 10, 11, 12
+_SKELETON = [(5, 6), (5, 7), (7, 9), (6, 8), (8, 10), (5, 11), (6, 12), (11, 12),
+             (11, 13), (13, 15), (12, 14), (14, 16)]
+KP_CONF = 0.4
+
+
+def detect_people(pose_model, person_model, frame: np.ndarray, conf: float = 0.35) -> sv.Detections:
+    """People as Detections; with a pose model, keypoints ride along in
+    ``det.data["keypoints"]`` (N, 17, 3: x, y, conf) and survive tracking and
+    filtering. Without one, falls back to the plain person detector."""
+    if pose_model is None:
+        return detect(person_model, frame, classes=[PERSON], conf=conf)
+    result = pose_model(frame, verbose=False, conf=conf)[0]
+    det = detections_from_yolo(result)
+    if len(det) and result.keypoints is not None:
+        det.data["keypoints"] = result.keypoints.data.cpu().numpy()
+    return det
+
+
+def keypoints(det: sv.Detections, i: int) -> np.ndarray | None:
+    kps = det.data.get("keypoints") if det.data else None
+    return None if kps is None or i >= len(kps) else kps[i]
+
+
+def _pt(kp: np.ndarray, idx: int):
+    return (float(kp[idx, 0]), float(kp[idx, 1])) if kp[idx, 2] >= KP_CONF else None
+
+
+def wrists(kp: np.ndarray) -> list[tuple[float, float]]:
+    return [p for p in (_pt(kp, L_WRIST), _pt(kp, R_WRIST)) if p is not None]
+
+
+def _torso(kp: np.ndarray):
+    """(shoulder_mid, hip_y, torso_len) or None if shoulders/hips not visible."""
+    ls, rs, lh, rh = (_pt(kp, i) for i in (L_SHOULDER, R_SHOULDER, L_HIP, R_HIP))
+    sh = [p for p in (ls, rs) if p]
+    hp = [p for p in (lh, rh) if p]
+    if not sh or not hp:
+        return None
+    sx = sum(p[0] for p in sh) / len(sh)
+    sy = sum(p[1] for p in sh) / len(sh)
+    hy = sum(p[1] for p in hp) / len(hp)
+    torso = hy - sy
+    return ((sx, sy), hy, torso) if torso > 4 else None
+
+
+def is_reaching(kp: np.ndarray) -> bool:
+    """A wrist raised above the shoulders, or stretched out sideways by more
+    than ~0.8 torso lengths (reaching to a shelf)."""
+    t = _torso(kp)
+    if t is None:
+        return False
+    (sx, sy), _, torso = t
+    return any(wy < sy or abs(wx - sx) > 0.8 * torso for wx, wy in wrists(kp))
+
+
+def hands_active(kp: np.ndarray) -> bool:
+    """Hands at working height (clearly above the hips) or reaching — i.e. the
+    person is handling something rather than standing with arms down."""
+    t = _torso(kp)
+    if t is None:
+        return False
+    _, hy, torso = t
+    return is_reaching(kp) or any(wy < hy - 0.15 * torso for _, wy in wrists(kp))
+
+
+def draw_skeleton(frame: np.ndarray, kp: np.ndarray, color, thickness: int = 2) -> None:
+    for a, b in _SKELETON:
+        pa, pb = _pt(kp, a), _pt(kp, b)
+        if pa and pb:
+            cv2.line(frame, (int(pa[0]), int(pa[1])), (int(pb[0]), int(pb[1])), color, thickness, cv2.LINE_AA)
+    for wx, wy in wrists(kp):
+        cv2.circle(frame, (int(wx), int(wy)), 4, color, -1, cv2.LINE_AA)
