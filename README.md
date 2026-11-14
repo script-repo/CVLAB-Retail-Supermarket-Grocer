@@ -87,7 +87,7 @@ uvicorn app.main:app --reload --port 8000
 # open http://localhost:8000
 ```
 
-CPU works (slower). With an NVIDIA GPU + CUDA-enabled PyTorch, set `DEVICE=cuda:0`.
+CPU works (slower; OpenVINO is used automatically to speed it up). With an NVIDIA GPU + CUDA-enabled PyTorch, set `DEVICE=cuda:0`; add `pip install -r requirements-gpu.txt` for TensorRT FP16.
 
 New to this? Read [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) for a
 plain-language walkthrough and troubleshooting.
@@ -194,6 +194,7 @@ useful:
 | Variable | Default | Purpose |
 |---|---|---|
 | `DEVICE` | `auto` | `auto` / `cpu` / `cuda:0` |
+| `MODEL_FORMAT` | `auto` | Inference runtime: TensorRT FP16 on GPU, OpenVINO on CPU (see [CONFIGURATION](docs/CONFIGURATION.md)) |
 | `STORAGE_BACKEND` | `auto` | `auto` / `s3` / `local` |
 | `NAI_BASE_URL` | _(blank)_ | OpenAI-compatible LLM endpoint (blank = disabled) |
 | `TARGET_FPS` | `12` | Server-side stream throttle |

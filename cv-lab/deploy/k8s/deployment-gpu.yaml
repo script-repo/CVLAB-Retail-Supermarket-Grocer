@@ -87,7 +87,10 @@ spec:
               # Reconcile deps every start: pip skips already-satisfied packages
               # in /deps and only installs new/changed requirements (e.g. httpx).
               echo "Reconciling Python deps onto PVC (torch from PyPI is the CUDA build)..."
-              pip install --no-cache-dir --target=/deps -r /app/backend/requirements.txt
+              # requirements-gpu.txt adds TensorRT so MODEL_FORMAT=auto can build an
+              # FP16 engine (cached on this PVC under /deps/models/exported).
+              pip install --no-cache-dir --target=/deps -r /app/backend/requirements.txt \
+                -r /app/backend/requirements-gpu.txt
               touch /deps/.installed
               echo "Dependencies reconciled."
               # ultralytics pulls full opencv-python (needs libGL). Force the
@@ -120,6 +123,9 @@ spec:
             - { name: LOCAL_STORAGE_DIR, value: "/data" }
             - { name: MODELS_DIR, value: /deps/models }
             - { name: PERSON_MODEL, value: yolov8n.pt }
+            # auto -> TensorRT FP16 engine on this GPU (built once on first start,
+            # a few minutes; falls back to PyTorch CUDA FP16 if the build fails).
+            - { name: MODEL_FORMAT, value: auto }
             - { name: TARGET_FPS, value: "15" }
             - { name: MAX_STREAM_WIDTH, value: "960" }
             - { name: FRONTEND_DIR, value: /app/frontend }

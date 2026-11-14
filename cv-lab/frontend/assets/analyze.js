@@ -215,6 +215,16 @@
     bar.className = "meter-fill" + (p >= 85 ? " hot" : p >= 50 ? " warm" : "");
   }
 
+  // "OpenVINO · FP32" etc. — what the loaded model actually runs on (else the plan).
+  function runtimeLabel(d) {
+    var labels = { tensorrt: "TensorRT", openvino: "OpenVINO", onnx: "ONNX Runtime", pytorch: "PyTorch", exported: "Exported model" };
+    var m = d && d.models && d.models[0];
+    var r = m ? m.runtime : (d && d.runtime ? d.runtime.runtime : null);
+    if (!r) return "";
+    var prec = m ? m.precision : (d.runtime.half ? "fp16" : "fp32");
+    return "  ·  " + (labels[r] || r) + " " + String(prec).toUpperCase() + (m ? "" : " (loading)");
+  }
+
   function renderGpu(d) {
     var badge = $("gpuBadge");
     var name = $("gpuName");
@@ -222,7 +232,7 @@
     if (!d || !d.available) {
       badge.textContent = "CPU";
       badge.className = "gpu-badge cpu";
-      name.textContent = d && d.device ? "Running on " + d.device + " (no GPU detected)" : "No GPU detected — CPU mode";
+      name.textContent = (d && d.device ? "Running on " + d.device + " (no GPU detected)" : "No GPU detected — CPU mode") + runtimeLabel(d);
       $("gpuUtilVal").textContent = "—"; setBar("gpuUtilBar", 0);
       $("gpuMemVal").textContent = "—"; setBar("gpuMemBar", 0);
       stats.innerHTML = "";
@@ -231,7 +241,7 @@
     var g = d.gpu || {};
     badge.textContent = d.in_use ? "Active" : "Idle";
     badge.className = "gpu-badge " + (d.in_use ? "active" : "idle");
-    name.textContent = (g.name || "GPU") + "  ·  " + (d.device || "");
+    name.textContent = (g.name || "GPU") + "  ·  " + (d.device || "") + runtimeLabel(d);
 
     var util = g.util_pct != null ? g.util_pct : 0;
     $("gpuUtilVal").textContent = g.util_pct != null ? Math.round(g.util_pct) + "%" : "—";

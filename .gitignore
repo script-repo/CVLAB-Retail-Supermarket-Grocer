@@ -33,6 +33,8 @@ _s3cache/
 *.onnx
 *.engine
 **/backend/models/*.pt
+**/models/exported/
+*_openvino_model/
 
 # --- Media / uploads ---
 *.mp4

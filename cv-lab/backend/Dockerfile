@@ -9,7 +9,15 @@
 # Deployment) and False otherwise. The app's DEVICE=auto setting (see
 # docs/CONFIGURATION.md) picks CUDA when available and falls back to CPU
 # automatically — no separate GPU image or build is needed.
+#
+# Inference runtime is also picked automatically (MODEL_FORMAT=auto): OpenVINO
+# on CPU (always installed), TensorRT FP16 on GPU when the image is built with
+#   --build-arg ACCEL=gpu      (adds requirements-gpu.txt, several GB larger)
+# Without it a GPU still runs PyTorch CUDA FP16. Mount a volume at
+# /app/backend/models/exported to keep exported models across restarts.
 FROM python:3.11-slim
+
+ARG ACCEL=cpu
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -22,8 +30,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY backend/requirements.txt backend/requirements.txt
-RUN pip install -r backend/requirements.txt
+COPY backend/requirements.txt backend/requirements-gpu.txt backend/
+RUN pip install -r backend/requirements.txt \
+    && if [ "$ACCEL" = "gpu" ]; then pip install -r backend/requirements-gpu.txt; fi
 
 COPY backend backend
 COPY frontend frontend

@@ -38,6 +38,14 @@ class Settings(BaseSettings):
     empty_shelf_model: str = ""                          # optional .pt for UC-2
     spill_model: str = ""                                # optional .pt for UC-16
     device: str = "auto"                                 # auto | cpu | cuda:0
+    # Inference runtime. "auto" picks the fastest one for the hardware:
+    # GPU -> TensorRT FP16 (if tensorrt installed) else PyTorch CUDA FP16;
+    # CPU -> OpenVINO (if installed) else ONNX Runtime else PyTorch.
+    model_format: str = "auto"                           # auto | pytorch | tensorrt | openvino | onnx
+    model_fp16: bool | None = None                       # None = FP16 on GPU, FP32 on CPU
+    model_imgsz: int = 640                               # inference / export input size
+    export_dir: Path | None = None                       # default: <models_dir>/exported
+    model_warmup: bool = True                            # load + export the COCO model at startup
 
     # --- LLM inference endpoint (any OpenAI-compatible API) ---
     # e.g. Nutanix Enterprise AI (NAI), vLLM, Ollama, OpenAI. Leave blank to run

@@ -47,6 +47,10 @@ spec:
                   key: S3_SECRET_KEY
             - name: DEVICE
               value: "cuda:0"
+            # auto -> TensorRT FP16 if the image was built with --build-arg ACCEL=gpu,
+            # else PyTorch CUDA FP16. Set EXPORT_DIR to a volume to keep the engine.
+            - name: MODEL_FORMAT
+              value: "auto"
             - name: TARGET_FPS
               value: "15"
             # LLM endpoint for the agentic-ops layer (any OpenAI-compatible API).

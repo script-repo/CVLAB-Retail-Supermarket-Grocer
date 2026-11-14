@@ -20,6 +20,38 @@ For local development, copy [`../.env.example`](../.env.example) to
 | Variable | Default | Description |
 |---|---|---|
 | `DEVICE` | `auto` | `auto` picks CUDA if available, else CPU. Force with `cpu` or `cuda:0`. |
+| `MODEL_FORMAT` | `auto` | Inference runtime. `auto` picks the fastest one for the hardware (below). Force with `pytorch`, `tensorrt`, `openvino` or `onnx`. |
+| `MODEL_FP16` | _(blank)_ | Blank = FP16 on GPU, FP32 on CPU. `false` forces FP32 on GPU. FP16 is never used on CPU. |
+| `MODEL_IMGSZ` | `640` | Model input size (also the size exported models are built for). |
+| `EXPORT_DIR` | `<MODELS_DIR>/exported` | Cache for exported models. Put it on a persistent volume so exports survive restarts. |
+| `MODEL_WARMUP` | `true` | Load (and, on first run, export) the COCO model in the background at startup. |
+
+### How `MODEL_FORMAT=auto` chooses
+
+| Hardware | Package present | Runtime used |
+|---|---|---|
+| NVIDIA GPU | `tensorrt` (`requirements-gpu.txt`) | **TensorRT engine, FP16** |
+| NVIDIA GPU | — | PyTorch on CUDA, FP16 |
+| CPU only | `openvino` (in `requirements.txt`) | **OpenVINO IR, FP32** |
+| CPU only | `onnxruntime` + `onnx` | ONNX Runtime |
+| CPU only | — | PyTorch |
+
+- The export runs once from the `.pt` weights and is cached in `EXPORT_DIR`.
+  OpenVINO takes seconds; a TensorRT engine takes a few minutes on first start.
+- TensorRT engines only run on the GPU model and TensorRT version that built
+  them. Both are in the cache file name, so moving to different hardware just
+  builds a new engine.
+- Any export or load error falls back to PyTorch on the same device and is
+  logged, so a missing package can only make inference slower, never break it.
+- `auto` only picks runtimes whose packages are already installed, so
+  Ultralytics never pip-installs anything at runtime.
+- `GET /api/gpu` reports the plan (`runtime`) and what each loaded model is
+  using (`models`). The UI's accelerator panel shows the same information.
+- Measured on a 4-core CPU (`yolov8n`, 1280×720 frames): PyTorch 57 ms/frame,
+  OpenVINO 21 ms/frame, with the same detections.
+
+Install GPU extras with `pip install -r requirements.txt -r requirements-gpu.txt`,
+or build the image with `--build-arg ACCEL=gpu`.
 
 ## Models
 

@@ -112,6 +112,8 @@ spec:
             - { name: LOCAL_STORAGE_DIR, value: "/data" }
             - { name: MODELS_DIR, value: /deps/models }
             - { name: PERSON_MODEL, value: yolov8n.pt }
+            # auto -> OpenVINO on CPU (exported once, cached under /deps/models/exported).
+            - { name: MODEL_FORMAT, value: auto }
             - { name: TARGET_FPS, value: "10" }
             - { name: MAX_STREAM_WIDTH, value: "800" }
             - { name: FRONTEND_DIR, value: /app/frontend }
