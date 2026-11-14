@@ -73,7 +73,7 @@ FastAPI backend
 ## Tech stack
 
 - Backend: FastAPI, Uvicorn, WebSockets
-- CV: Ultralytics YOLOv8 (COCO person), `supervision` (zones, ByteTrack, traces), OpenCV, NumPy
+- CV: Ultralytics YOLO11 (COCO person), `supervision` (zones, ByteTrack, traces), OpenCV, NumPy
 - Storage: boto3 → Nutanix Objects / MinIO (S3-compatible)
 
 ## Run locally (Docker)
@@ -106,7 +106,7 @@ CPU works (slower). With an NVIDIA GPU + CUDA torch, set `DEVICE=cuda:0`.
 - `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_USE_PATH_STYLE`, `S3_VERIFY_SSL`
 - `DEVICE` — `auto` | `cpu` | `cuda:0`
 - `TARGET_FPS`, `JPEG_QUALITY`, `MAX_STREAM_WIDTH`, `MAX_UPLOAD_MB`
-- `PERSON_MODEL` (default `yolov8n.pt`), `EMPTY_SHELF_MODEL`, `SPILL_MODEL`
+- `PERSON_MODEL` (default `yolo11n.pt`), `EMPTY_SHELF_MODEL`, `SPILL_MODEL`
 
 ### Optional pretrained weights (UC-2 / UC-16)
 

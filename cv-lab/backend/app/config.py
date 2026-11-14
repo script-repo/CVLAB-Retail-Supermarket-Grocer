@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     # --- Models ---
     models_dir: Path = Path("models")
-    person_model: str = "yolov8n.pt"                     # COCO; person class = 0
+    person_model: str = "yolo11n.pt"                     # COCO; person class = 0
     empty_shelf_model: str = ""                          # optional .pt for UC-2
     spill_model: str = ""                                # optional .pt for UC-16
     device: str = "auto"                                 # auto | cpu | cuda:0

@@ -75,14 +75,14 @@ def _has_module(name: str) -> bool:
 
 def _resolve_weights(name: str) -> str | None:
     """Resolve a weights name to a path. Ultralytics auto-downloads bare COCO
-    names like ``yolov8n.pt`` on first use, so those pass through unchanged."""
+    names like ``yolo11n.pt`` on first use, so those pass through unchanged."""
     if not name:
         return None
     settings = get_settings()
     candidate = settings.models_dir / name
     if candidate.exists():
         return str(candidate)
-    # Bare ultralytics names (e.g. yolov8n.pt) are downloaded on demand.
+    # Bare ultralytics names (e.g. yolo11n.pt) are downloaded on demand.
     if Path(name).suffix == ".pt" and "/" not in name and "\\" not in name:
         return name
     if Path(name).exists():
@@ -163,7 +163,9 @@ def _export(base, weights: Path, plan: RuntimePlan, imgsz: int) -> Path:
         return target
     target.parent.mkdir(parents=True, exist_ok=True)
     fmt = _FORMATS[plan.runtime]
-    kwargs: dict = {"format": fmt, "imgsz": imgsz, "half": plan.half, "device": plan.device}
+    # Ultralytics >=8.4 expresses precision as quantize=16 (FP16) / None (FP32).
+    kwargs: dict = {"format": fmt, "imgsz": imgsz, "device": plan.device,
+                    "quantize": 16 if plan.half else None}
     if fmt in ("engine", "onnx"):
         # simplify would require onnxslim + onnxruntime(-gpu); TensorRT does its
         # own graph optimisation, so skip it to avoid surprise installs.
@@ -225,8 +227,10 @@ def _load_pytorch(weights: str, plan: RuntimePlan, imgsz: int) -> InferenceModel
         device = "cpu"
         model.to(device)
     half = plan.half and device.startswith("cuda")
-    return InferenceModel(model, "pytorch", device, half, weights,
-                          {"device": device, "half": half, "imgsz": imgsz})
+    kwargs = {"device": device, "imgsz": imgsz}
+    if half:
+        kwargs["quantize"] = 16  # FP16 compute on CUDA
+    return InferenceModel(model, "pytorch", device, half, weights, kwargs)
 
 
 def load_yolo(name: str) -> InferenceModel:
@@ -252,8 +256,9 @@ def load_yolo(name: str) -> InferenceModel:
                 wpath = Path(base.ckpt_path or weights)
                 exported = _export(base, wpath, plan, imgsz)
                 yolo = YOLO(str(exported), task=base.task)
+                # Exported artifacts carry their own precision; only device/imgsz apply.
                 model = InferenceModel(yolo, plan.runtime, plan.device, plan.half, weights,
-                                       {"device": plan.device, "half": plan.half, "imgsz": imgsz})
+                                       {"device": plan.device, "imgsz": imgsz})
                 _warmup(model, imgsz)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("%s runtime unavailable for '%s' (%s); falling back to PyTorch",
@@ -262,7 +267,7 @@ def load_yolo(name: str) -> InferenceModel:
         elif not is_pt:
             yolo = YOLO(weights)
             model = InferenceModel(yolo, "exported", plan.device, plan.half, weights,
-                                   {"device": plan.device, "half": plan.half, "imgsz": imgsz})
+                                   {"device": plan.device, "imgsz": imgsz})
 
         if model is None:
             model = _load_pytorch(weights, plan, imgsz)

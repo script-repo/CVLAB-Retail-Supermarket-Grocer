@@ -6,6 +6,5 @@
 # inference through it. Without them, GPU hosts still run PyTorch CUDA in FP16.
 # The TensorRT wheel bundles its own CUDA 12 libraries (several GB).
 tensorrt-cu12>=10.3,!=10.1.0
-# The engine is built via ONNX; recent PyTorch's ONNX exporter needs onnxscript.
-onnx>=1.12.0,<1.20
-onnxscript
+# The engine is built via an intermediate ONNX graph.
+onnx>=1.12.0,<2.0.0

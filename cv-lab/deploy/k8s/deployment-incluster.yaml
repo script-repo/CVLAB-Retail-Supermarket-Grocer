@@ -59,8 +59,8 @@ spec:
               # (which imports cv2) succeeds. Idempotent: only downloads if missing.
               echo "Ensuring YOLO weights..."
               mkdir -p /deps/models
-              if [ ! -f /deps/models/yolov8n.pt ]; then
-                PYTHONPATH=/deps python -c "from ultralytics import YOLO; YOLO('/deps/models/yolov8n.pt')"
+              if [ ! -f /deps/models/yolo11n.pt ]; then
+                PYTHONPATH=/deps python -c "from ultralytics import YOLO; YOLO('/deps/models/yolo11n.pt')"
               fi
           volumeMounts:
             - { name: src, mountPath: /src }
@@ -82,7 +82,7 @@ spec:
             - { name: DEVICE, value: "cpu" }
             - { name: TARGET_FPS, value: "10" }
             - { name: MAX_STREAM_WIDTH, value: "800" }
-            - { name: PERSON_MODEL, value: /deps/models/yolov8n.pt }
+            - { name: PERSON_MODEL, value: /deps/models/yolo11n.pt }
             - { name: MODELS_DIR, value: /deps/models }
             - { name: FRONTEND_DIR, value: /app/frontend }
             # Agentic state (events/work orders SQLite) must outlive the pod:

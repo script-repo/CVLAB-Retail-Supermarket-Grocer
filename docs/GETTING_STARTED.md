@@ -81,7 +81,7 @@ To stop: press `Ctrl+C`, then `docker compose down`.
 
 6. Open **http://localhost:8000**.
 
-> The first analysis run downloads the YOLOv8 model weights (~6 MB) automatically.
+> The first analysis run downloads the YOLO11 model weights (~6 MB) automatically.
 
 ---
 
@@ -119,7 +119,7 @@ still works.
 | "video_id is required" | You selected the **Video** source but didn't pick/upload a video. |
 | Analysis is very slow | You're on CPU. Lower `TARGET_FPS`/`MAX_STREAM_WIDTH`, use a smaller video, or run on a GPU (`DEVICE=cuda:0`). |
 | RTSP stream won't open | Verify the URL works in VLC; some cameras need credentials in the URL. |
-| Model download fails | Check internet access; or pre-place `yolov8n.pt` in `cv-lab/backend/models/`. |
+| Model download fails | Check internet access; or pre-place `yolo11n.pt` in `cv-lab/backend/models/`. |
 
 Still stuck? Open an issue (see [../SECURITY.md](../SECURITY.md) before pasting
 logs — don't include secrets).

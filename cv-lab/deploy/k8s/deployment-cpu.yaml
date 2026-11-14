@@ -91,8 +91,8 @@ spec:
               pip install --no-cache-dir --target=/deps --no-deps opencv-python-headless==4.10.0.84
               echo "Ensuring YOLO weights..."
               mkdir -p /deps/models
-              if [ ! -f /deps/models/yolov8n.pt ]; then
-                PYTHONPATH=/deps python -c "from ultralytics import YOLO; YOLO('/deps/models/yolov8n.pt')"
+              if [ ! -f /deps/models/yolo11n.pt ]; then
+                PYTHONPATH=/deps python -c "from ultralytics import YOLO; YOLO('/deps/models/yolo11n.pt')"
               fi
           volumeMounts:
             - { name: src, mountPath: /src }
@@ -111,7 +111,7 @@ spec:
             - { name: STORAGE_BACKEND, value: "local" }
             - { name: LOCAL_STORAGE_DIR, value: "/data" }
             - { name: MODELS_DIR, value: /deps/models }
-            - { name: PERSON_MODEL, value: yolov8n.pt }
+            - { name: PERSON_MODEL, value: yolo11n.pt }
             # auto -> OpenVINO on CPU (exported once, cached under /deps/models/exported).
             - { name: MODEL_FORMAT, value: auto }
             - { name: TARGET_FPS, value: "10" }

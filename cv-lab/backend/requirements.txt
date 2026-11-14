@@ -7,15 +7,14 @@ pydantic-settings==2.7.1
 websockets==14.1
 
 # Computer vision
-ultralytics==8.3.55
+ultralytics==8.4.194
 supervision==0.25.1
 opencv-python-headless==4.10.0.84
 numpy==1.26.4
 Pillow==11.0.0
 # CPU inference runtime: MODEL_FORMAT=auto exports YOLO to OpenVINO IR on CPU-only
-# hosts (~2-3x faster than PyTorch). Unused on GPU. <2026 keeps the
-# openvino.runtime API that ultralytics 8.3.x imports.
-openvino>=2024.5.0,<2026.0
+# hosts (~2-3x faster than PyTorch). Unused on GPU.
+openvino>=2024.5.0,<2027.0
 
 # Storage (Nutanix Objects / S3-compatible)
 boto3==1.35.90

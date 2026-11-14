@@ -47,8 +47,16 @@ For local development, copy [`../.env.example`](../.env.example) to
   Ultralytics never pip-installs anything at runtime.
 - `GET /api/gpu` reports the plan (`runtime`) and what each loaded model is
   using (`models`). The UI's accelerator panel shows the same information.
-- Measured on a 4-core CPU (`yolov8n`, 1280×720 frames): PyTorch 57 ms/frame,
-  OpenVINO 21 ms/frame, with the same detections.
+- Measured on a 4-core CPU (Ultralytics 8.4, 1280×720 frames, mean of 40):
+
+  | Weights | PyTorch | OpenVINO |
+  |---|---|---|
+  | `yolov8n.pt` | 37 ms | 19 ms |
+  | `yolo11n.pt` (default) | 40 ms | 22 ms |
+  | `yolo26n.pt` | 42 ms | 22 ms |
+
+  Detections match between runtimes. YOLO11n is more accurate than YOLOv8n
+  (COCO mAP 39.5 vs 37.3) for about the same cost.
 
 Install GPU extras with `pip install -r requirements.txt -r requirements-gpu.txt`,
 or build the image with `--build-arg ACCEL=gpu`.
@@ -58,7 +66,7 @@ or build the image with `--build-arg ACCEL=gpu`.
 | Variable | Default | Description |
 |---|---|---|
 | `MODELS_DIR` | `models` | Where model weights live / are downloaded. |
-| `PERSON_MODEL` | `yolov8n.pt` | YOLOv8 weights (COCO). Person class = 0. |
+| `PERSON_MODEL` | `yolo11n.pt` | YOLO weights (COCO). Person class = 0. Any Ultralytics detector works (e.g. `yolo26n.pt`, `yolo11s.pt`). |
 | `EMPTY_SHELF_MODEL` | _(blank)_ | Optional custom `.pt` for UC-2 (out-of-stock). |
 | `SPILL_MODEL` | _(blank)_ | Optional custom `.pt` for UC-16 (spill). |
 
