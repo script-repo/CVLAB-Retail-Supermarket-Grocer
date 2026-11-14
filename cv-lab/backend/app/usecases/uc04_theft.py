@@ -9,9 +9,10 @@ With a pose model (``POSE_MODEL``), each person's wrists are tracked. A
 shelf-to-bag gesture is a hand moving into a bag's box within
 ``gesture_window_s`` (default 3 s) of that person reaching (arm raised or
 stretched out). Simply carrying a bag doesn't count. Gestures are shown on the
-person and reported as evidence on the review. ``require_gesture``
-(off by default) only flags people who made one, cutting false positives from
-shoppers who merely linger with a bag.
+person and reported as evidence on the review. ``require_gesture`` (on by
+default) only flags people who made one, cutting false positives from shoppers
+who merely linger with a bag; set it false for the dwell + bag rule alone. The
+dwell + bag rule is also what runs when no pose model is available.
 """
 from __future__ import annotations
 
@@ -45,7 +46,7 @@ class TheftAnalyzer(UseCaseAnalyzer):
         self.w, self.h = w, h
         self.model = get_coco_model()
         self.pose = get_pose_model()
-        self.require_gesture = str(config.params.get("require_gesture", False)).lower() in ("1", "true", "yes")
+        self.require_gesture = str(config.params.get("require_gesture", True)).lower() in ("1", "true", "yes")
         self.gestures: dict[int, int] = {}   # track id -> hand-to-bag gestures
         self._hand_in: dict[int, bool] = {}
         self._last_reach: dict[int, float] = {}

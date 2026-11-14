@@ -96,7 +96,7 @@ const USE_CASES = [
       "Privacy: behaviour-only — no facial recognition / no identity store"
     ],
     models: [
-      { name: "YOLO11 Pose (17 keypoints)", role: "Wrist tracking → shelf-to-bag gestures", why: "Counts a hand going into a bag shortly after reaching, as review evidence; optional require_gesture mode ignores people who just linger with a bag. Body keypoints only — no face or identity." },
+      { name: "YOLO11 Pose (17 keypoints)", role: "Wrist tracking → shelf-to-bag gestures", why: "Counts a hand going into a bag shortly after reaching, and by default only people who made such a gesture are flagged, ignoring shoppers who just linger with a bag. Body keypoints only — no face or identity." },
       { name: "YOLO11 (COCO)", role: "Person + bag (backpack/handbag/suitcase) detection", why: "Detects the actors and the bags involved without any biometric model." },
       { name: "ByteTrack (Supervision)", role: "Per-person dwell timing", why: "Sustained loitering near a shelf is a key behavioural signal; the tracker measures it per anonymous ID." },
       { name: "Behaviour heuristic", role: "Dwell + bag-proximity → review event", why: "Combines signals into a staff 'review event' — flags behaviour for a human to judge, never a 'confirmed theft'." }
@@ -327,6 +327,7 @@ const USE_CASES = [
       "Nutanix Volumes (PVC) — model/deps cache"
     ],
     models: [
+      { name: "SAM 2.1-tiny (Segment Anything)", role: "Spill outline", why: "Traces the exact spill shape from the detected region and reports its area, so the work order shows how big the spill is." },
       { name: "YOLOE-26 (open-vocabulary, text prompt)", role: "Wet-floor sign detection", why: "Prompted with \"wet floor sign\" — no training. A sign next to the spill marks it cordoned and records the response time." },
       { name: "Roboflow spill / wet-floor YOLOv8 (optional weights)", role: "Spill region detection", why: "Trained on wet-floor/spill imagery; drops into the registry for accurate hazard segmentation." },
       { name: "Background-subtraction heuristic (OpenCV)", role: "New-on-floor region + persistence", why: "Detects a new persistent region on the floor and only alerts once it stays put, reducing false positives — works with no weights." }

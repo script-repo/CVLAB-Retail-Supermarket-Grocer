@@ -145,6 +145,16 @@ def _cpu_has_bf16() -> bool:
         return False
 
 
+def _cpu_has_vnni() -> bool | None:
+    """True/False from the CPU flags (VNNI = hardware INT8 dot products), or
+    None when the flags can't be read (non-Linux)."""
+    try:
+        flags = Path("/proc/cpuinfo").read_text()
+    except OSError:
+        return None
+    return "avx512_vnni" in flags or "avx_vnni" in flags
+
+
 def _want_int8() -> tuple[bool, str]:
     mode = (get_settings().model_int8 or "auto").strip().lower()
     if mode in ("false", "0", "no", "off"):
@@ -153,8 +163,12 @@ def _want_int8() -> tuple[bool, str]:
         if mode != "auto":
             logger.warning("MODEL_INT8=%s but nncf is not installed; using FP32", mode)
         return False, ""
-    if mode == "auto" and _cpu_has_bf16():
-        return False, " (BF16-capable CPU: FP32 models already run in BF16; INT8 skipped)"
+    if mode == "auto":
+        if _cpu_has_bf16():
+            return False, " (BF16-capable CPU: FP32 models already run in BF16; INT8 skipped)"
+        if not _cpu_has_vnni():
+            # Without VNNI, INT8 gains are small or negative: stay on FP32.
+            return False, " (CPU without VNNI: INT8 skipped)"
     return True, " + INT8"
 
 
@@ -520,7 +534,8 @@ def get_sam_model():
             from ultralytics import SAM
 
             plan = plan_runtime()
-            model = InferenceModel(SAM(name), "pytorch", plan.device, False, name,
+            weights = _resolve_weights(name) or name  # prefer MODELS_DIR copy
+            model = InferenceModel(SAM(weights), "pytorch", plan.device, False, name,
                                    {"device": plan.device})
         except Exception as exc:  # noqa: BLE001
             logger.warning("Segment model '%s' unavailable: %s", name, exc)

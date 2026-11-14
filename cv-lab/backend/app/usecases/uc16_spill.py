@@ -20,7 +20,7 @@ People are removed from the heuristic's change mask (``exclude_people``, on by
 default; the person detector only runs on frames that changed), so shoppers
 walking through are no longer counted as spill area.
 
-Spill outline (Segment Anything, opt-in via ``SEG_MODEL``): while a spill is
+Spill outline (Segment Anything, ``SEG_MODEL``, on by default): while a spill is
 confirmed, a background worker prompts SAM with the spill box plus its most
 interior changed point every ``outline_every_s``. The outline is shown and
 ``spill_area_frac`` reported only if it passes a sanity check (mostly inside

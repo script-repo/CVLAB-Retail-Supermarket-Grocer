@@ -40,9 +40,10 @@ class Settings(BaseSettings):
     # Pose model (17 COCO keypoints). Adds hand/posture signals to UC-4, UC-13 and
     # UC-20 and replaces their person detector. Blank disables them.
     pose_model: str = "yolo11n-pose.pt"
-    # Segment Anything model for UC-16's spill outline (e.g. sam2.1_t.pt). Opt-in:
-    # ~2 s per run on CPU (runs in the background), much faster on GPU.
-    seg_model: str = ""
+    # Segment Anything model for UC-16's spill outline. Runs in a background
+    # thread every few seconds while a spill is confirmed (~2 s per run on CPU,
+    # tens of ms on GPU). Blank disables.
+    seg_model: str = "sam2.1_t.pt"
     # Open-vocabulary (text-prompted) YOLOE checkpoint for prompt-driven roles,
     # e.g. UC-16's wet-floor-sign check. Blank disables those roles.
     open_vocab_model: str = "yoloe-26n-seg.pt"

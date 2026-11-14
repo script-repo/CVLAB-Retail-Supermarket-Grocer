@@ -33,8 +33,11 @@ merchandising/compliance gaps.
 Highlights suspicious behaviors (concealment, dwell near high-value goods) as
 loss-prevention cues. With the pose model it counts **shelf-to-bag gestures**: a
 hand going into a bag within 3 s of reaching (`gesture_window_s`). Carrying a
-bag doesn't count. Set the `require_gesture` param to flag only people who made
-one. On the bundled queue video this cut review events from 10 to 2.
+bag doesn't count. By default (`require_gesture`, on) only people who made such
+a gesture are flagged for review. On the bundled queue video this cut review
+events from 10 to 2. Set `require_gesture` to false to flag everyone who
+lingers near a bag (the old rule). It's also the rule used when the pose model
+is unavailable.
 
 ### UC-5 — Self-Checkout Fraud Detection · `loss-prevention` · **Zone**
 Monitors the self-checkout area for scan-avoidance / mis-scan patterns.
@@ -82,17 +85,20 @@ looks for a **wet-floor sign**: one placed next to a confirmed spill marks it
 (`response_s`). The spill remains an alert until it is cleaned up. People
 walking through are removed from the change mask (`exclude_people`, default on).
 
-**Spill outline with SAM (opt-in, `SEG_MODEL=sam2.1_t.pt`).** While a spill is
+**Spill outline with SAM (on by default, `SEG_MODEL=sam2.1_t.pt`; blank disables).** While a spill is
 confirmed, SAM 2.1-tiny is prompted every `outline_every_s` (3 s) with the spill
 box and its most interior changed point, in a background thread. The outline
 replaces the box and `spill_area_frac` is reported only if it passes a sanity
 check (≥50% inside the changed area, ≤25% of the floor).
-- Cost: about 2 s per run on CPU, a few tens of ms on GPU.
-- Off by default because it depends on a valid clean-floor reference frame.
+- Cost: about 2 s per run on CPU, a few tens of ms on GPU. While it runs it
+  competes for CPU with the stream: on 4 cores UC-16 went from ~40 to ~70
+  ms/frame during a spill (still within a 10 fps budget). Only runs while a
+  spill is confirmed.
+- It depends on a valid clean-floor reference frame, so it suits fixed cameras.
   - On the bundled demo video, where the camera angle changes between clips,
     one accepted outline traced the shelf base instead of the spill.
   - Where the reference was valid, the outlines traced the wine accurately.
-- Enable it on fixed cameras and check the outlines on your own footage.
+- Check the outlines on your own footage; set `SEG_MODEL=` to turn it off.
 
 ### UC-17 — Visual Product Search for Shoppers · `product-recognition`
 Demonstrates "find similar products" visual search from a frame.

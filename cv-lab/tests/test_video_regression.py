@@ -81,8 +81,9 @@ def test_uc20_engagement_and_reaches():
 
 
 def test_uc04_require_gesture_cuts_reviews():
-    base = run("uc-04", QUEUE)[-1][1]["values"]
-    strict = run("uc-04", QUEUE, (("require_gesture", True),))[-1][1]["values"]
+    # Default is require_gesture=on; false = the old dwell + bag rule.
+    base = run("uc-04", QUEUE, (("require_gesture", False),))[-1][1]["values"]
+    strict = run("uc-04", QUEUE)[-1][1]["values"]
     assert base["total_review_events"] >= 5
     assert strict["total_review_events"] <= 4
     assert strict["total_review_events"] < base["total_review_events"]

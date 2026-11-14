@@ -23,7 +23,7 @@ For local development, copy [`../.env.example`](../.env.example) to
 | `MODEL_FORMAT` | `auto` | Inference runtime. `auto` picks the fastest one for the hardware (below). Force with `pytorch`, `tensorrt`, `openvino` or `onnx`. |
 | `MODEL_FP16` | _(blank)_ | Blank = FP16 on GPU, FP32 on CPU. `false` forces FP32 on GPU. FP16 is never used on CPU. |
 | `MODEL_IMGSZ` | `640` | Model input size (also the size exported models are built for). |
-| `MODEL_INT8` | `auto` | INT8 OpenVINO detector on CPU. `auto` = only on CPUs without BF16/AMX, when `nncf` is installed (`requirements-int8.txt`). `true` forces it, `false` disables. Pose/YOLOE models stay FP32. |
+| `MODEL_INT8` | `auto` | INT8 OpenVINO detector on CPU. `auto` = only on CPUs with VNNI but without BF16/AMX, when `nncf` is installed (`requirements-int8.txt`). `true` forces it, `false` disables. Pose/YOLOE models stay FP32. |
 | `CALIB_DIR` | _(blank)_ | Images for INT8 calibration. Blank = sample `CALIB_FRAMES` (300) frames from stored/bundled videos. |
 | `EXPORT_DIR` | `<MODELS_DIR>/exported` | Cache for exported models. Put it on a persistent volume so exports survive restarts. |
 | `MODEL_WARMUP` | `true` | Load (and, on first run, export) the COCO model in the background at startup. |
@@ -83,7 +83,7 @@ or build the image with `--build-arg ACCEL=gpu`.
 | `EMPTY_SHELF_MODEL` | _(blank)_ | Optional custom `.pt` for UC-2 (out-of-stock). |
 | `SPILL_MODEL` | _(blank)_ | Optional custom `.pt` for UC-16 (spill). |
 | `POSE_MODEL` | `yolo11n-pose.pt` | Keypoint model for UC-4 / UC-13 / UC-20 hand and posture signals; replaces their person detector. Blank disables (original behaviour). |
-| `SEG_MODEL` | _(blank)_ | Segment Anything weights (e.g. `sam2.1_t.pt`) for UC-16's spill outline. Opt-in; see USE_CASES.md. |
+| `SEG_MODEL` | `sam2.1_t.pt` | Segment Anything weights for UC-16's spill outline (background thread, only while a spill is confirmed). Blank disables. See USE_CASES.md. |
 | `OPEN_VOCAB_MODEL` | `yoloe-26n-seg.pt` | Text-prompted YOLOE checkpoint for prompt-driven features (UC-16 wet-floor sign). Blank disables them. |
 
 **Open-vocabulary (text-prompted) models.** `get_prompted_model([...prompts])`

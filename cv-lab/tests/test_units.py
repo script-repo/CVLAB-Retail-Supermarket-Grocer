@@ -104,3 +104,25 @@ def test_pose_reach_up_and_sideways():
 
 def test_pose_missing_torso_is_not_active():
     assert not C.hands_active(_kp(lw=(0, 0), rw=(5, 5)))
+
+
+def _int8(monkeypatch, mode="auto", nncf=True, bf16=False, vnni=True):
+    monkeypatch.setenv("MODEL_INT8", mode)
+    get_settings.cache_clear()
+    monkeypatch.setattr(M, "_has_module", lambda name: nncf if name == "nncf" else True)
+    monkeypatch.setattr(M, "_cpu_has_bf16", lambda: bf16)
+    monkeypatch.setattr(M, "_cpu_has_vnni", lambda: vnni)
+    return M._want_int8()[0]
+
+
+def test_int8_auto_only_with_vnni_and_without_amx(monkeypatch):
+    assert _int8(monkeypatch) is True                      # VNNI, no AMX: faster
+    assert _int8(monkeypatch, bf16=True) is False          # AMX: FP32 already runs as BF16
+    assert _int8(monkeypatch, vnni=False) is False         # no VNNI: little/no gain
+    assert _int8(monkeypatch, vnni=None) is False          # unknown CPU: stay safe
+    assert _int8(monkeypatch, nncf=False) is False         # extra not installed
+
+
+def test_int8_explicit_modes(monkeypatch):
+    assert _int8(monkeypatch, mode="true", bf16=True, vnni=False) is True
+    assert _int8(monkeypatch, mode="false") is False
