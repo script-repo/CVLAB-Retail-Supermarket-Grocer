@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     model_fp16: bool | None = None                       # None = FP16 on GPU, FP32 on CPU
     model_imgsz: int = 640                               # inference / export input size
     export_dir: Path | None = None                       # default: <models_dir>/exported
+    # INT8 for CPU/OpenVINO detectors. auto = only on CPUs without BF16/AMX (where
+    # it is ~1.5x faster; AMX CPUs already run FP32 models in BF16) and when nncf
+    # is installed and calibration frames are available.
+    model_int8: str = "auto"                             # auto | true | false
+    calib_dir: Path | None = None                        # images for INT8 calibration
+    calib_frames: int = 300                              # Ultralytics recommends >=300
     model_warmup: bool = True                            # load + export COCO, pose, YOLOE models at startup
 
     # --- LLM inference endpoint (any OpenAI-compatible API) ---

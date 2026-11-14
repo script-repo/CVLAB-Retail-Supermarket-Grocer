@@ -18,6 +18,8 @@
 FROM python:3.11-slim
 
 ARG ACCEL=cpu
+# --build-arg INT8=true adds nncf so CPUs without AMX can run an INT8 detector.
+ARG INT8=false
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -30,9 +32,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY backend/requirements.txt backend/requirements-gpu.txt backend/
+COPY backend/requirements.txt backend/requirements-gpu.txt backend/requirements-int8.txt backend/
 RUN pip install -r backend/requirements.txt \
-    && if [ "$ACCEL" = "gpu" ]; then pip install -r backend/requirements-gpu.txt; fi
+    && if [ "$ACCEL" = "gpu" ]; then pip install -r backend/requirements-gpu.txt; fi \
+    && if [ "$INT8" = "true" ]; then pip install -r backend/requirements-int8.txt; fi
 
 COPY backend backend
 COPY frontend frontend

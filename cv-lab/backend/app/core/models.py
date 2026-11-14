@@ -101,6 +101,7 @@ class RuntimePlan:
     runtime: str                # "tensorrt" | "openvino" | "onnx" | "pytorch"
     half: bool                  # FP16 inference
     reason: str = ""
+    int8: bool = False          # INT8 (OpenVINO, detect models only)
 
 
 def plan_runtime() -> RuntimePlan:
@@ -127,11 +128,74 @@ def plan_runtime() -> RuntimePlan:
         return RuntimePlan(dev, "pytorch", half, "CUDA GPU; TensorRT not installed")
     if dev == "cpu":
         if _has_module("openvino"):
-            return RuntimePlan(dev, "openvino", False, "CPU + OpenVINO installed")
+            int8, why = _want_int8()
+            return RuntimePlan(dev, "openvino", False, "CPU + OpenVINO installed" + why, int8=int8)
         if _has_module("onnxruntime") and _has_module("onnx"):
             return RuntimePlan(dev, "onnx", False, "CPU + ONNX Runtime installed")
         return RuntimePlan(dev, "pytorch", False, "CPU; no accelerated runtime installed")
     return RuntimePlan(dev, "pytorch", False, f"device {dev}")
+
+
+def _cpu_has_bf16() -> bool:
+    try:
+        import openvino as ov
+
+        return "BF16" in ov.Core().get_property("CPU", "OPTIMIZATION_CAPABILITIES")
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _want_int8() -> tuple[bool, str]:
+    mode = (get_settings().model_int8 or "auto").strip().lower()
+    if mode in ("false", "0", "no", "off"):
+        return False, ""
+    if not _has_module("nncf"):
+        if mode != "auto":
+            logger.warning("MODEL_INT8=%s but nncf is not installed; using FP32", mode)
+        return False, ""
+    if mode == "auto" and _cpu_has_bf16():
+        return False, " (BF16-capable CPU: FP32 models already run in BF16; INT8 skipped)"
+    return True, " + INT8"
+
+
+def _calibration_yaml(names) -> Path | None:
+    """Build a small calibration dataset (YOLO yaml) from CALIB_DIR images, or
+    frames sampled from stored / bundled videos. None if too few frames."""
+    import cv2
+    import yaml
+
+    s = get_settings()
+    out = (s.export_dir or (s.models_dir / "exported")) / "calibration"
+    img_dir = out / "images"
+    exts = (".jpg", ".jpeg", ".png")
+    if s.calib_dir and len([p for p in s.calib_dir.glob("*") if p.suffix.lower() in exts]) >= 16:
+        root, rel = s.calib_dir, "."
+    else:
+        if not (img_dir.is_dir() and len(list(img_dir.glob("*.jpg"))) >= 16):
+            videos = sorted(Path(s.local_storage_dir).rglob("*.mp4"))
+            bundled = Path(__file__).resolve().parents[4] / "video-assets"
+            videos += sorted(bundled.glob("*.mp4")) if bundled.is_dir() else []
+            if not videos:
+                return None
+            img_dir.mkdir(parents=True, exist_ok=True)
+            per = max(1, s.calib_frames // len(videos))
+            for v in videos[: s.calib_frames]:
+                cap = cv2.VideoCapture(str(v))
+                n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
+                for k in range(per):
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, int(k * n / per))
+                    ok, frame = cap.read()
+                    if ok:
+                        cv2.imwrite(str(img_dir / f"{v.stem}_{k}.jpg"), frame)
+            if len(list(img_dir.glob("*.jpg"))) < 16:
+                return None
+        root, rel = out, "images"
+    names = dict(names) if isinstance(names, dict) else dict(enumerate(names))
+    cfg = out / "calib.yaml"
+    out.mkdir(parents=True, exist_ok=True)
+    cfg.write_text(yaml.safe_dump({"path": str(Path(root).resolve()), "train": rel, "val": rel,
+                                   "names": names}))
+    return cfg
 
 
 def _engine_tag() -> str:
@@ -158,7 +222,8 @@ def _export_target(weights: Path, plan: RuntimePlan, imgsz: int,
     out_dir = s.export_dir or (s.models_dir / "exported")
     # Prompted (open-vocabulary) models bake their classes in, so the prompt
     # set is part of the cache key.
-    stem = f"{weights.stem}{_prompt_tag(prompts)}-{imgsz}{'-fp16' if plan.half else ''}"
+    stem = (f"{weights.stem}{_prompt_tag(prompts)}-{imgsz}{'-fp16' if plan.half else ''}"
+            f"{'-int8' if plan.int8 else ''}")
     if plan.runtime == "tensorrt":
         return out_dir / f"{stem}-{_engine_tag()}.engine"
     if plan.runtime == "openvino":
@@ -167,16 +232,27 @@ def _export_target(weights: Path, plan: RuntimePlan, imgsz: int,
 
 
 def _export(base, weights: Path, plan: RuntimePlan, imgsz: int,
-            prompts: tuple[str, ...] | None = None) -> Path:
-    """Export ``base`` (a loaded .pt YOLO) for ``plan`` and cache the result."""
+            prompts: tuple[str, ...] | None = None) -> tuple[Path, bool]:
+    """Export ``base`` (a loaded .pt YOLO) for ``plan`` and cache the result.
+
+    Returns (path, int8) — INT8 is dropped for non-detect / prompted models
+    and when no calibration frames are available."""
+    calib = None
+    if plan.int8:
+        # INT8 needs task-matched calibration data: plain detectors only.
+        calib = _calibration_yaml(base.names) if base.task == "detect" and not prompts else None
+        if calib is None:
+            plan = RuntimePlan(plan.device, plan.runtime, plan.half, plan.reason, int8=False)
     target = _export_target(weights, plan, imgsz, prompts)
     if target.exists():
-        return target
+        return target, plan.int8
     target.parent.mkdir(parents=True, exist_ok=True)
     fmt = _FORMATS[plan.runtime]
     # Ultralytics >=8.4 expresses precision as quantize=16 (FP16) / None (FP32).
     kwargs: dict = {"format": fmt, "imgsz": imgsz, "device": plan.device,
-                    "quantize": 16 if plan.half else None}
+                    "quantize": 8 if plan.int8 else (16 if plan.half else None)}
+    if calib is not None:
+        kwargs["data"] = str(calib)
     if fmt in ("engine", "onnx"):
         # simplify would require onnxslim + onnxruntime(-gpu); TensorRT does its
         # own graph optimisation, so skip it to avoid surprise installs.
@@ -188,7 +264,7 @@ def _export(base, weights: Path, plan: RuntimePlan, imgsz: int,
         if target.exists():
             shutil.rmtree(target) if target.is_dir() else target.unlink()
         shutil.move(str(produced), str(target))
-    return target
+    return target, plan.int8
 
 
 @dataclass
@@ -207,6 +283,7 @@ class InferenceModel:
     weights: str
     predict_kwargs: dict = field(default_factory=dict)
     prompts: tuple[str, ...] | None = None
+    int8: bool = False
 
     def __call__(self, source, **kwargs):
         return self.model(source, **{**self.predict_kwargs, **kwargs})
@@ -219,7 +296,8 @@ class InferenceModel:
 
     def info(self) -> dict:
         out = {"weights": self.weights, "runtime": self.runtime,
-               "device": self.device, "precision": "fp16" if self.half else "fp32"}
+               "device": self.device,
+               "precision": "int8" if self.int8 else ("fp16" if self.half else "fp32")}
         if self.prompts:
             out["prompts"] = list(self.prompts)
         return out
@@ -287,11 +365,11 @@ def load_yolo(name: str, prompts: tuple[str, ...] | None = None) -> InferenceMod
             try:
                 base = _open_pt(weights, prompts)  # downloads bare names on first use
                 wpath = Path(base.ckpt_path or weights)
-                exported = _export(base, wpath, plan, imgsz, prompts)
+                exported, int8 = _export(base, wpath, plan, imgsz, prompts)
                 yolo = YOLO(str(exported), task=base.task)
                 # Exported artifacts carry their own precision; only device/imgsz apply.
                 model = InferenceModel(yolo, plan.runtime, plan.device, plan.half, weights,
-                                       {"device": plan.device, "imgsz": imgsz}, prompts)
+                                       {"device": plan.device, "imgsz": imgsz}, prompts, int8)
                 _warmup(model, imgsz)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("%s runtime unavailable for '%s' (%s); falling back to PyTorch",
@@ -306,7 +384,7 @@ def load_yolo(name: str, prompts: tuple[str, ...] | None = None) -> InferenceMod
             model = _load_pytorch(weights, plan, imgsz, prompts)
             _warmup(model, imgsz)
         logger.info("Loaded YOLO '%s' via %s on %s (%s) — %s", name, model.runtime, model.device,
-                    "fp16" if model.half else "fp32", plan.reason)
+                    model.info()["precision"], plan.reason)
         _cache[key] = model
         return model
 

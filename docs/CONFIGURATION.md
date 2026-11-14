@@ -23,6 +23,8 @@ For local development, copy [`../.env.example`](../.env.example) to
 | `MODEL_FORMAT` | `auto` | Inference runtime. `auto` picks the fastest one for the hardware (below). Force with `pytorch`, `tensorrt`, `openvino` or `onnx`. |
 | `MODEL_FP16` | _(blank)_ | Blank = FP16 on GPU, FP32 on CPU. `false` forces FP32 on GPU. FP16 is never used on CPU. |
 | `MODEL_IMGSZ` | `640` | Model input size (also the size exported models are built for). |
+| `MODEL_INT8` | `auto` | INT8 OpenVINO detector on CPU. `auto` = only on CPUs without BF16/AMX, when `nncf` is installed (`requirements-int8.txt`). `true` forces it, `false` disables. Pose/YOLOE models stay FP32. |
+| `CALIB_DIR` | _(blank)_ | Images for INT8 calibration. Blank = sample `CALIB_FRAMES` (300) frames from stored/bundled videos. |
 | `EXPORT_DIR` | `<MODELS_DIR>/exported` | Cache for exported models. Put it on a persistent volume so exports survive restarts. |
 | `MODEL_WARMUP` | `true` | Load (and, on first run, export) the COCO model in the background at startup. |
 
@@ -57,6 +59,17 @@ For local development, copy [`../.env.example`](../.env.example) to
 
   Detections match between runtimes. YOLO11n is more accurate than YOLOv8n
   (COCO mAP 39.5 vs 37.3) for about the same cost.
+
+INT8 on CPU (measured with `yolo11n`, 640×640, on a Xeon with AMX):
+
+| Mode | ms/frame |
+|---|---|
+| FP32 model, OpenVINO default (runs as BF16 on AMX) | 17.5 |
+| True FP32 (what CPUs without AMX run) | 30.6 |
+| INT8 | 19.5 |
+
+INT8 matched 98.9% of FP32's person detections over 200 frames from the bundled
+videos. On AMX CPUs it adds nothing, which is why `auto` skips it there.
 
 Install GPU extras with `pip install -r requirements.txt -r requirements-gpu.txt`,
 or build the image with `--build-arg ACCEL=gpu`.

@@ -1,0 +1,10 @@
+# Optional INT8 for CPU hosts — install ON TOP of requirements.txt:
+#   pip install -r requirements.txt -r requirements-int8.txt
+#
+# With nncf present, MODEL_INT8=auto quantizes the COCO detector to INT8 for
+# OpenVINO on CPUs without BF16/AMX (about 1.5x faster than true FP32 there,
+# ~99% of detections unchanged in our test). AMX CPUs (e.g. Xeon Sapphire
+# Rapids and newer) already run FP32 models in BF16, so INT8 is skipped there.
+# Calibration uses CALIB_DIR images or frames sampled from stored videos.
+# Pulls in pandas/scipy/scikit-learn (a few hundred MB).
+nncf>=2.14.0,<3.0.0

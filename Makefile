@@ -4,7 +4,7 @@
 BACKEND := cv-lab/backend
 COMPOSE := cv-lab/deploy/docker-compose.yml
 
-.PHONY: help install run compose down test image clean
+.PHONY: help install run compose down test test-units test-videos image clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -13,7 +13,7 @@ help: ## Show this help
 install: ## Create venv and install backend dependencies
 	cd $(BACKEND) && python -m venv .venv && \
 	  ./.venv/bin/pip install --upgrade pip && \
-	  ./.venv/bin/pip install -r requirements.txt
+	  ./.venv/bin/pip install -r requirements.txt -r requirements-dev.txt
 
 run: ## Run the backend locally (local-disk storage)
 	cd $(BACKEND) && STORAGE_BACKEND=local ./.venv/bin/uvicorn app.main:app --reload --port 8000
@@ -26,6 +26,12 @@ down: ## Stop the Docker stack
 
 test: ## Run the analyzer smoke test
 	cd $(BACKEND) && STORAGE_BACKEND=local DEVICE=cpu ./.venv/bin/python ../selftest.py
+
+test-units: ## Fast unit tests (runtime planning, inference merging, pose maths)
+	cd cv-lab && DEVICE=cpu $(CURDIR)/$(BACKEND)/.venv/bin/python -m pytest -q -c tests/pytest.ini tests/test_units.py
+
+test-videos: ## End-to-end regression tests over video-assets/ (slow, downloads models)
+	cd cv-lab && DEVICE=cpu MODELS_DIR=$(CURDIR)/$(BACKEND)/models $(CURDIR)/$(BACKEND)/.venv/bin/python -m pytest -q -c tests/pytest.ini tests/test_video_regression.py
 
 image: ## Build the container image
 	docker build -f $(BACKEND)/Dockerfile -t cvlab-retail:0.1.0 cv-lab

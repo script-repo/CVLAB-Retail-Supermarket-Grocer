@@ -21,7 +21,7 @@ jobs:
         working-directory: cv-lab/backend
         run: |
           python -m pip install --upgrade pip
-          pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
+          pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt -r requirements-dev.txt
 
       - name: Byte-compile (syntax check)
         working-directory: cv-lab/backend
@@ -32,7 +32,24 @@ jobs:
         env:
           DEVICE: cpu
           STORAGE_BACKEND: local
+          PYTHONPATH: .
         run: python ../selftest.py
+
+      - name: Unit tests
+        working-directory: cv-lab
+        run: python -m pytest -q -c tests/pytest.ini tests/test_units.py
+
+      # Downloaded weights + OpenVINO exports, reused across runs.
+      - uses: actions/cache@v4
+        with:
+          path: cv-lab/backend/models
+          key: models-${{ hashFiles('cv-lab/backend/requirements.txt', 'cv-lab/backend/app/config.py') }}
+
+      - name: Video regression tests
+        working-directory: cv-lab
+        env:
+          MODELS_DIR: ${{ github.workspace }}/cv-lab/backend/models
+        run: python -m pytest -q -c tests/pytest.ini tests/test_video_regression.py
 
   # Build & push a container image to GHCR (uncomment and adjust to enable).
   #
