@@ -70,6 +70,7 @@ or build the image with `--build-arg ACCEL=gpu`.
 | `EMPTY_SHELF_MODEL` | _(blank)_ | Optional custom `.pt` for UC-2 (out-of-stock). |
 | `SPILL_MODEL` | _(blank)_ | Optional custom `.pt` for UC-16 (spill). |
 | `POSE_MODEL` | `yolo11n-pose.pt` | Keypoint model for UC-4 / UC-13 / UC-20 hand and posture signals; replaces their person detector. Blank disables (original behaviour). |
+| `SEG_MODEL` | _(blank)_ | Segment Anything weights (e.g. `sam2.1_t.pt`) for UC-16's spill outline. Opt-in; see USE_CASES.md. |
 | `OPEN_VOCAB_MODEL` | `yoloe-26n-seg.pt` | Text-prompted YOLOE checkpoint for prompt-driven features (UC-16 wet-floor sign). Blank disables them. |
 
 **Open-vocabulary (text-prompted) models.** `get_prompted_model([...prompts])`

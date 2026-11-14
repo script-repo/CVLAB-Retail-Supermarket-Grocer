@@ -79,7 +79,20 @@ Detects spills/obstructions on the floor as safety hazards. Optional custom
 model via `SPILL_MODEL`. A text-prompted YOLOE model (`OPEN_VOCAB_MODEL`) also
 looks for a **wet-floor sign**: one placed next to a confirmed spill marks it
 *cordoned*, stops the unattended timer and reports the response time
-(`response_s`). The spill remains an alert until it is cleaned up.
+(`response_s`). The spill remains an alert until it is cleaned up. People
+walking through are removed from the change mask (`exclude_people`, default on).
+
+**Spill outline with SAM (opt-in, `SEG_MODEL=sam2.1_t.pt`).** While a spill is
+confirmed, SAM 2.1-tiny is prompted every `outline_every_s` (3 s) with the spill
+box and its most interior changed point, in a background thread. The outline
+replaces the box and `spill_area_frac` is reported only if it passes a sanity
+check (≥50% inside the changed area, ≤25% of the floor).
+- Cost: about 2 s per run on CPU, a few tens of ms on GPU.
+- Off by default because it depends on a valid clean-floor reference frame.
+  - On the bundled demo video, where the camera angle changes between clips,
+    one accepted outline traced the shelf base instead of the spill.
+  - Where the reference was valid, the outlines traced the wine accurately.
+- Enable it on fixed cameras and check the outlines on your own footage.
 
 ### UC-17 — Visual Product Search for Shoppers · `product-recognition`
 Demonstrates "find similar products" visual search from a frame.

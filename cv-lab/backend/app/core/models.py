@@ -329,6 +329,7 @@ def warmup_models(prompt_sets: list[list[str]] | None = None) -> None:
     except Exception as exc:  # noqa: BLE001
         logger.warning("Model warm-up failed: %s", exc)
     get_pose_model()
+    get_sam_model()
     for prompts in prompt_sets or []:
         get_prompted_model(prompts)
 
@@ -376,6 +377,33 @@ def get_pose_model():
     except Exception as exc:  # noqa: BLE001
         logger.warning("Pose model '%s' unavailable: %s", name, exc)
         return None
+
+
+def get_sam_model():
+    """Segment Anything (``SEG_MODEL``, e.g. ``sam2.1_t.pt``), or None.
+
+    Prompted with points/boxes, so it stays in PyTorch (not exported). Calls
+    are not thread-safe; callers serialise them (see UC-16).
+    """
+    name = get_settings().seg_model
+    if not name:
+        return None
+    key = "sam:" + name
+    with _lock:
+        if key in _cache:
+            return _cache[key]
+        try:
+            from ultralytics import SAM
+
+            plan = plan_runtime()
+            model = InferenceModel(SAM(name), "pytorch", plan.device, False, name,
+                                   {"device": plan.device})
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Segment model '%s' unavailable: %s", name, exc)
+            return None
+        logger.info("Loaded segment model '%s' on %s", name, plan.device)
+        _cache[key] = model
+        return model
 
 
 def get_empty_shelf_model():
