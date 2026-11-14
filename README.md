@@ -179,6 +179,7 @@ same flow runs on deterministic local logic, so it always works offline. See
 - [Getting started](docs/GETTING_STARTED.md) — plain-language setup + troubleshooting
 - [Architecture](docs/ARCHITECTURE.md) — components and data flow
 - [Configuration](docs/CONFIGURATION.md) — every environment variable
+- [Training](docs/TRAINING.md) — pre-label your footage, train, plug models in
 - [Deployment](docs/DEPLOYMENT.md) — Docker, local, and the legacy k8s path
 - [GitOps on NKP](docs/gitops-nkp-pipeline.md) — live GitHub → GHCR → Flux path
 - [Use cases](docs/USE_CASES.md) — the 20 analyzers in detail

@@ -8,6 +8,9 @@ websockets==14.1
 
 # Computer vision
 ultralytics==8.4.194
+# Pinned: supervision>=0.26 removed sv.ByteTrack (moved to the `trackers` package),
+# which 7 use cases use. Upgrading means migrating app/core/tracking.py and
+# re-baselining tests/test_video_regression.py.
 supervision==0.25.1
 opencv-python-headless==4.10.0.84
 numpy==1.26.4
