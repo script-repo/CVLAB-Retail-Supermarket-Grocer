@@ -8,7 +8,7 @@ don't.
 
 | Pattern | Meaning |
 |---|---|
-| people-tracking | Detect + track people (YOLOv8 + ByteTrack) |
+| people-tracking | Detect + track people (YOLO11 + ByteTrack) |
 | shelf-vision | Analyze shelves/products (detection + OpenCV heuristics) |
 | loss-prevention | Behavior/anomaly cues for shrink & fraud |
 | product-recognition | Identify/inspect products or shipments |
@@ -71,7 +71,10 @@ Watches fridge/freezer doors for open-too-long compliance events.
 
 ### UC-16 — Spill & Hazard Detection · `task-ops`
 Detects spills/obstructions on the floor as safety hazards. Optional custom
-model via `SPILL_MODEL`.
+model via `SPILL_MODEL`. A text-prompted YOLOE model (`OPEN_VOCAB_MODEL`) also
+looks for a **wet-floor sign**: one placed next to a confirmed spill marks it
+*cordoned*, stops the unattended timer and reports the response time
+(`response_s`). The spill remains an alert until it is cleaned up.
 
 ### UC-17 — Visual Product Search for Shoppers · `product-recognition`
 Demonstrates "find similar products" visual search from a frame.

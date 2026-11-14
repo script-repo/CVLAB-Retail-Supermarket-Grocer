@@ -21,7 +21,8 @@
     "uc-16": [
       { key: "diff_thresh", label: "Change sensitivity", min: 10, max: 90, step: 5, def: 35 },
       { key: "min_area_frac", label: "Min spill area (% of floor)", min: 0.002, max: 0.08, step: 0.002, def: 0.01, pct: true },
-      { key: "persist_frames", label: "Persistence (frames)", min: 2, max: 40, step: 1, def: 12 }
+      { key: "persist_frames", label: "Persistence (frames)", min: 2, max: 40, step: 1, def: 12 },
+      { key: "sign_conf", label: "Wet-floor sign confidence", min: 0.05, max: 0.8, step: 0.05, def: 0.25 }
     ]
   };
 

@@ -28,6 +28,7 @@ importable, so Ultralytics never pip-installs packages at runtime.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 import shutil
@@ -145,10 +146,19 @@ def _engine_tag() -> str:
         return "unknown"
 
 
-def _export_target(weights: Path, plan: RuntimePlan, imgsz: int) -> Path:
+def _prompt_tag(prompts: tuple[str, ...] | None) -> str:
+    if not prompts:
+        return ""
+    return "-p" + hashlib.sha1("\n".join(prompts).encode()).hexdigest()[:8]
+
+
+def _export_target(weights: Path, plan: RuntimePlan, imgsz: int,
+                   prompts: tuple[str, ...] | None = None) -> Path:
     s = get_settings()
     out_dir = s.export_dir or (s.models_dir / "exported")
-    stem = f"{weights.stem}-{imgsz}{'-fp16' if plan.half else ''}"
+    # Prompted (open-vocabulary) models bake their classes in, so the prompt
+    # set is part of the cache key.
+    stem = f"{weights.stem}{_prompt_tag(prompts)}-{imgsz}{'-fp16' if plan.half else ''}"
     if plan.runtime == "tensorrt":
         return out_dir / f"{stem}-{_engine_tag()}.engine"
     if plan.runtime == "openvino":
@@ -156,9 +166,10 @@ def _export_target(weights: Path, plan: RuntimePlan, imgsz: int) -> Path:
     return out_dir / f"{stem}.onnx"
 
 
-def _export(base, weights: Path, plan: RuntimePlan, imgsz: int) -> Path:
+def _export(base, weights: Path, plan: RuntimePlan, imgsz: int,
+            prompts: tuple[str, ...] | None = None) -> Path:
     """Export ``base`` (a loaded .pt YOLO) for ``plan`` and cache the result."""
-    target = _export_target(weights, plan, imgsz)
+    target = _export_target(weights, plan, imgsz, prompts)
     if target.exists():
         return target
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -195,6 +206,7 @@ class InferenceModel:
     half: bool
     weights: str
     predict_kwargs: dict = field(default_factory=dict)
+    prompts: tuple[str, ...] | None = None
 
     def __call__(self, source, **kwargs):
         return self.model(source, **{**self.predict_kwargs, **kwargs})
@@ -206,8 +218,11 @@ class InferenceModel:
         return getattr(self.model, name)
 
     def info(self) -> dict:
-        return {"weights": self.weights, "runtime": self.runtime,
-                "device": self.device, "precision": "fp16" if self.half else "fp32"}
+        out = {"weights": self.weights, "runtime": self.runtime,
+               "device": self.device, "precision": "fp16" if self.half else "fp32"}
+        if self.prompts:
+            out["prompts"] = list(self.prompts)
+        return out
 
 
 def _warmup(m: InferenceModel, imgsz: int) -> None:
@@ -216,10 +231,22 @@ def _warmup(m: InferenceModel, imgsz: int) -> None:
         m(dummy, verbose=False)
 
 
-def _load_pytorch(weights: str, plan: RuntimePlan, imgsz: int) -> InferenceModel:
-    from ultralytics import YOLO
+def _open_pt(weights: str, prompts: tuple[str, ...] | None):
+    """Load .pt weights; for a prompted model, set its text-prompt classes."""
+    if not prompts:
+        from ultralytics import YOLO
 
-    model = YOLO(weights)
+        return YOLO(weights)
+    from ultralytics import YOLOE
+
+    model = YOLOE(weights)
+    model.set_classes(list(prompts))  # encodes the prompts with MobileCLIP
+    return model
+
+
+def _load_pytorch(weights: str, plan: RuntimePlan, imgsz: int,
+                  prompts: tuple[str, ...] | None = None) -> InferenceModel:
+    model = _open_pt(weights, prompts)
     device = plan.device
     try:
         model.to(device)
@@ -230,14 +257,20 @@ def _load_pytorch(weights: str, plan: RuntimePlan, imgsz: int) -> InferenceModel
     kwargs = {"device": device, "imgsz": imgsz}
     if half:
         kwargs["quantize"] = 16  # FP16 compute on CUDA
-    return InferenceModel(model, "pytorch", device, half, weights, kwargs)
+    return InferenceModel(model, "pytorch", device, half, weights, kwargs, prompts)
 
 
-def load_yolo(name: str) -> InferenceModel:
-    """Load (and cache) a YOLO model by weights name/path on the best runtime."""
+def load_yolo(name: str, prompts: tuple[str, ...] | None = None) -> InferenceModel:
+    """Load (and cache) a YOLO model by weights name/path on the best runtime.
+
+    ``prompts`` turns an open-vocabulary YOLOE checkpoint into a detector for
+    those text prompts (class i = prompts[i]); each prompt set is cached and
+    exported separately.
+    """
+    key = name + _prompt_tag(prompts)
     with _lock:
-        if name in _cache:
-            return _cache[name]
+        if key in _cache:
+            return _cache[key]
         from ultralytics import YOLO
 
         settings = get_settings()
@@ -252,13 +285,13 @@ def load_yolo(name: str) -> InferenceModel:
         is_pt = Path(weights).suffix == ".pt"
         if plan.runtime != "pytorch" and is_pt:
             try:
-                base = YOLO(weights)  # downloads bare names on first use
+                base = _open_pt(weights, prompts)  # downloads bare names on first use
                 wpath = Path(base.ckpt_path or weights)
-                exported = _export(base, wpath, plan, imgsz)
+                exported = _export(base, wpath, plan, imgsz, prompts)
                 yolo = YOLO(str(exported), task=base.task)
                 # Exported artifacts carry their own precision; only device/imgsz apply.
                 model = InferenceModel(yolo, plan.runtime, plan.device, plan.half, weights,
-                                       {"device": plan.device, "imgsz": imgsz})
+                                       {"device": plan.device, "imgsz": imgsz}, prompts)
                 _warmup(model, imgsz)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("%s runtime unavailable for '%s' (%s); falling back to PyTorch",
@@ -270,11 +303,11 @@ def load_yolo(name: str) -> InferenceModel:
                                    {"device": plan.device, "imgsz": imgsz})
 
         if model is None:
-            model = _load_pytorch(weights, plan, imgsz)
+            model = _load_pytorch(weights, plan, imgsz, prompts)
             _warmup(model, imgsz)
         logger.info("Loaded YOLO '%s' via %s on %s (%s) — %s", name, model.runtime, model.device,
                     "fp16" if model.half else "fp32", plan.reason)
-        _cache[name] = model
+        _cache[key] = model
         return model
 
 
@@ -302,6 +335,27 @@ def get_coco_model():
     Used by object/product use-cases that need classes beyond `person`
     (bottles, produce, bags, etc.)."""
     return load_yolo(get_settings().person_model)
+
+
+def get_prompted_model(prompts: list[str] | tuple[str, ...]):
+    """Open-vocabulary detector for the given text prompts, or None.
+
+    Uses ``OPEN_VOCAB_MODEL`` (a YOLOE checkpoint). Returns None when that is
+    blank, or when the CLIP tokenizer package is missing (so Ultralytics never
+    tries to pip-install it at runtime), or when loading fails; callers keep
+    their non-prompted behaviour in that case. Class ``i`` = ``prompts[i]``.
+    """
+    name = get_settings().open_vocab_model
+    if not name or not prompts:
+        return None
+    if not _has_module("clip"):
+        logger.warning("Open-vocabulary model disabled: install clip-anytorch (see requirements.txt)")
+        return None
+    try:
+        return load_yolo(name, tuple(p.strip() for p in prompts if p.strip()))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Open-vocabulary model '%s' unavailable: %s", name, exc)
+        return None
 
 
 def get_empty_shelf_model():

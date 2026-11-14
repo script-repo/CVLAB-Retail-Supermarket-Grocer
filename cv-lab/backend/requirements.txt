@@ -15,6 +15,12 @@ Pillow==11.0.0
 # CPU inference runtime: MODEL_FORMAT=auto exports YOLO to OpenVINO IR on CPU-only
 # hosts (~2-3x faster than PyTorch). Unused on GPU.
 openvino>=2024.5.0,<2027.0
+# Text encoder for open-vocabulary (YOLOE) prompts, e.g. UC-16's wet-floor-sign
+# check. PyPI build of the `clip` module Ultralytics imports. It needs
+# pkg_resources, which setuptools>=81 removed. Only used when a prompt set is
+# first exported; without it the prompted features switch off cleanly.
+clip-anytorch==2.6.0
+setuptools<81
 
 # Storage (Nutanix Objects / S3-compatible)
 boto3==1.35.90

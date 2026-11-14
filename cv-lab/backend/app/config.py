@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     person_model: str = "yolo11n.pt"                     # COCO; person class = 0
     empty_shelf_model: str = ""                          # optional .pt for UC-2
     spill_model: str = ""                                # optional .pt for UC-16
+    # Open-vocabulary (text-prompted) YOLOE checkpoint for prompt-driven roles,
+    # e.g. UC-16's wet-floor-sign check. Blank disables those roles.
+    open_vocab_model: str = "yoloe-26n-seg.pt"
     device: str = "auto"                                 # auto | cpu | cuda:0
     # Inference runtime. "auto" picks the fastest one for the hardware:
     # GPU -> TensorRT FP16 (if tensorrt installed) else PyTorch CUDA FP16;

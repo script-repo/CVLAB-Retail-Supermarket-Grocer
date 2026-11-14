@@ -9,6 +9,12 @@ Two strategies:
   persistent new region on the floor (appears and stays put) is flagged as a
   spill. An "unattended" dwell timer counts how long it remains before staff
   arrive.
+
+Response tracking (open-vocabulary YOLOE, optional): every few frames a
+text-prompted detector looks for a wet-floor sign. A sign next to a confirmed
+spill marks it CORDONED and stops the unattended timer (the spill stays an
+alert until it is cleaned up). Disabled when no open-vocabulary model is
+available; spill detection itself is unchanged.
 """
 from __future__ import annotations
 
@@ -17,12 +23,14 @@ from typing import Any
 import cv2
 import numpy as np
 
-from app.core.models import get_spill_model
+from app.core.models import get_prompted_model, get_spill_model
 from app.core.tracking import detections_from_yolo
 from app.schemas import AnalysisConfig
 
-from .base import (BRAND_ORANGE, BRAND_RED, UseCaseAnalyzer, draw_banner,
+from .base import (BRAND_CYAN, BRAND_ORANGE, BRAND_RED, UseCaseAnalyzer, draw_banner,
                    polygons_to_pixels, register)
+
+_SIGN_PROMPTS = ["wet floor sign"]
 
 
 @register
@@ -60,6 +68,18 @@ class SpillAnalyzer(UseCaseAnalyzer):
         self.first_seen_s: float | None = None
         self.detected_at: float | None = None
 
+        # Wet-floor-sign check (response tracking). Signs are static, so a few
+        # checks per second are plenty and keep the CPU cost low.
+        prompts = config.params.get("sign_prompts") or _SIGN_PROMPTS
+        if isinstance(prompts, str):
+            prompts = [p for p in prompts.split(",") if p.strip()]
+        self.sign_model = get_prompted_model(prompts)
+        self.sign_conf: float = float(config.params.get("sign_conf", 0.25))
+        self.sign_every: int = max(1, int(config.params.get("sign_every", max(1, self.fps // 3))))
+        self.sign_near_frac: float = float(config.params.get("sign_near_frac", 0.15))
+        self.signs: list[tuple[int, int, int, int]] = []
+        self.cordoned_at: float | None = None
+
     def _detect_model(self, frame: np.ndarray) -> list[tuple[int, int, int, int]]:
         result = self.model(frame, verbose=False)[0]
         dets = detections_from_yolo(result)
@@ -88,9 +108,24 @@ class SpillAnalyzer(UseCaseAnalyzer):
                 boxes.append((x, y, x + bw, y + bh))
         return boxes
 
+    def _detect_signs(self, frame: np.ndarray) -> list[tuple[int, int, int, int]]:
+        result = self.sign_model(frame, verbose=False, conf=self.sign_conf)[0]
+        return [tuple(int(v) for v in b) for b in result.boxes.xyxy.tolist()]
+
+    def _sign_near(self, boxes: list[tuple[int, int, int, int]]) -> bool:
+        """True if any sign overlaps a spill box grown by sign_near_frac of the width."""
+        pad = self.sign_near_frac * self.w
+        for sx1, sy1, sx2, sy2 in self.signs:
+            for x1, y1, x2, y2 in boxes:
+                if sx1 <= x2 + pad and sx2 >= x1 - pad and sy1 <= y2 + pad and sy2 >= y1 - pad:
+                    return True
+        return False
+
     def process_frame(self, frame: np.ndarray, timestamp_s: float) -> tuple[np.ndarray, dict[str, Any]]:
         self.frame_index += 1
         boxes = self._detect_model(frame) if self.use_model else self._detect_heuristic(frame)
+        if self.sign_model is not None and self.frame_index % self.sign_every == 1 % self.sign_every:
+            self.signs = self._detect_signs(frame)
 
         # Persistence: a real spill stays put across frames.
         if boxes:
@@ -102,6 +137,7 @@ class SpillAnalyzer(UseCaseAnalyzer):
             if self.persist == 0:
                 self.first_seen_s = None
                 self.detected_at = None
+                self.cordoned_at = None
 
         confirmed = self.persist >= self.persist_frames and bool(boxes)
         if confirmed and self.detected_at is None:
@@ -110,14 +146,28 @@ class SpillAnalyzer(UseCaseAnalyzer):
         # Draw ROI outline
         cv2.polylines(frame, [self.roi], True, BRAND_ORANGE, 1)
 
+        for (x1, y1, x2, y2) in self.signs:
+            cv2.rectangle(frame, (x1, y1), (x2, y2), BRAND_CYAN, 2)
+            cv2.putText(frame, "WET FLOOR SIGN", (x1, max(18, y1 - 6)), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5, BRAND_CYAN, 2, cv2.LINE_AA)
+
         unattended_s = 0.0
+        response_s = None
         if confirmed:
-            unattended_s = timestamp_s - (self.detected_at or timestamp_s)
+            if self.cordoned_at is None and self._sign_near(boxes):
+                self.cordoned_at = timestamp_s
+            end = self.cordoned_at if self.cordoned_at is not None else timestamp_s
+            unattended_s = max(0.0, end - (self.detected_at or end))
             for (x1, y1, x2, y2) in boxes:
                 cv2.rectangle(frame, (x1, y1), (x2, y2), BRAND_RED, 2)
                 cv2.putText(frame, "HAZARD", (x1, max(18, y1 - 6)), cv2.FONT_HERSHEY_SIMPLEX,
                             0.6, BRAND_RED, 2, cv2.LINE_AA)
-            headline = f"SPILL DETECTED — alert nearest associate  ·  unattended {unattended_s:0.0f}s"
+            if self.cordoned_at is not None:
+                response_s = unattended_s
+                headline = (f"SPILL CORDONED — wet-floor sign placed after {response_s:0.0f}s"
+                            "  ·  cleanup pending")
+            else:
+                headline = f"SPILL DETECTED — alert nearest associate  ·  unattended {unattended_s:0.0f}s"
         else:
             strategy = "model" if self.use_model else "heuristic"
             headline = f"Floor clear ({strategy})"
@@ -130,5 +180,9 @@ class SpillAnalyzer(UseCaseAnalyzer):
             "regions": len(boxes) if confirmed else 0,
             "unattended_s": round(unattended_s, 1),
             "persist": self.persist,
+            "signs": len(self.signs),
+            "cordoned": confirmed and self.cordoned_at is not None,
+            "response_s": round(response_s, 1) if response_s is not None else None,
+            "sign_check": self.sign_model is not None,
         }
         return frame, {"status": "alert" if confirmed else "ok", "headline": headline, "values": metrics}

@@ -69,6 +69,22 @@ or build the image with `--build-arg ACCEL=gpu`.
 | `PERSON_MODEL` | `yolo11n.pt` | YOLO weights (COCO). Person class = 0. Any Ultralytics detector works (e.g. `yolo26n.pt`, `yolo11s.pt`). |
 | `EMPTY_SHELF_MODEL` | _(blank)_ | Optional custom `.pt` for UC-2 (out-of-stock). |
 | `SPILL_MODEL` | _(blank)_ | Optional custom `.pt` for UC-16 (spill). |
+| `OPEN_VOCAB_MODEL` | `yoloe-26n-seg.pt` | Text-prompted YOLOE checkpoint for prompt-driven features (UC-16 wet-floor sign). Blank disables them. |
+
+**Open-vocabulary (text-prompted) models.** `get_prompted_model([...prompts])`
+in `core/models.py` turns the YOLOE checkpoint into a detector for any list of
+text prompts. Each prompt set is exported and cached like the other models
+(OpenVINO on CPU, TensorRT on GPU), so the text encoder only runs on first use.
+The first export downloads the YOLOE weights and a MobileCLIP text encoder; on
+air-gapped hosts, run once with internet access and keep `EXPORT_DIR` on a
+persistent volume. If `clip-anytorch` is missing, prompted features switch off
+and log a warning.
+
+In zero-shot tests on the bundled videos, prompts were reliable for distinct
+objects (e.g. "wet floor sign") but **not** for empty shelf gaps, liquid spills
+or telling products apart ("salsa jar" vs "tortilla chips"). Those use cases
+keep their heuristics or optional trained weights. A YOLOE model fine-tuned on
+your own shelf images is the path to SKU-level results.
 
 > **Swapping the detector / AGPL note:** YOLOv8 is AGPL-3.0, which is why this
 > project is AGPL-3.0. To use a different license, replace the YOLOv8 dependency
